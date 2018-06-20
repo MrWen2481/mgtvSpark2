@@ -13,6 +13,7 @@ case class MidChnlDay (
      conf_channel_id:String,
      apk_version:String,
      flag:String,
+     is_timeshift:String,
      dt:String,
      platform:String,
      source_type:String

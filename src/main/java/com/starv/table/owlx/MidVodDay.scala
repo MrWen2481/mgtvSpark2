@@ -9,10 +9,10 @@ case class MidVodDay (
      play_start_time:String,
      play_end_time:String,
      media_id:String,
-     media_name:String,
-     category_id:String,
+     var media_name:String,
+     var category_id:String,
      apk_version:String,
-     channel_id:String,
+     var channel_id:String,
      dt:String,
      platform:String,
      source_type:String
