@@ -270,7 +270,7 @@ object YDSdk {
       //过滤测试用户
       for (elem <- testUserList.value) {
         if (source.user_id.startsWith(elem)) {
-           false
+          false
         }
       }
       true
@@ -454,48 +454,48 @@ object YDSdk {
          |insert overwrite table owlx.user_info_pool
          |select * from p
       """.stripMargin)
-//
-//    //开机
-//    var df = spark.sql(
-//      s"""
-//         | select
-//         |  user_id,
-//         |  create_time,
-//         |  regionid,
-//         |  apk_version,
-//         |  '$dt',
-//         |  platform,
-//         |  source_type
-//         | from
-//         |   t
-//         |  where state = '$init'
-//      """.stripMargin)
-//    CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
-//
-//    //直播
-//    spark.sql(
-//      s"""
-//         | insert overwrite table owlx.mid_chnl_day
-//         | select
-//         |  t.user_id,
-//         |  p.regionid,
-//         |  t.play_start_time,
-//         |  t.play_end_time,
-//         |  t.channel_id,
-//         |  t.channel_name,
-//         |  t.conf_channel_code,
-//         |  p.apk_version,
-//         |  t.live_flag,
-//         |  t.is_timeshift,
-//         |  p.dt,
-//         |  p.platform,
-//         |  p.source_type
-//         |  from
-//         | t , p
-//         | where t.user_id = p.user_id
-//         | and t.state in ('$live','$timeShift')
-//         |
-//      """.stripMargin)
+    //
+    //    //开机
+    //    var df = spark.sql(
+    //      s"""
+    //         | select
+    //         |  user_id,
+    //         |  create_time,
+    //         |  regionid,
+    //         |  apk_version,
+    //         |  '$dt',
+    //         |  platform,
+    //         |  source_type
+    //         | from
+    //         |   t
+    //         |  where state = '$init'
+    //      """.stripMargin)
+    //    CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
+    //
+    //    //直播
+    //    spark.sql(
+    //      s"""
+    //         | insert overwrite table owlx.mid_chnl_day
+    //         | select
+    //         |  t.user_id,
+    //         |  p.regionid,
+    //         |  t.play_start_time,
+    //         |  t.play_end_time,
+    //         |  t.channel_id,
+    //         |  t.channel_name,
+    //         |  t.conf_channel_code,
+    //         |  p.apk_version,
+    //         |  t.live_flag,
+    //         |  t.is_timeshift,
+    //         |  p.dt,
+    //         |  p.platform,
+    //         |  p.source_type
+    //         |  from
+    //         | t , p
+    //         | where t.user_id = p.user_id
+    //         | and t.state in ('$live','$timeShift')
+    //         |
+    //      """.stripMargin)
 
 
     //点播
@@ -539,7 +539,7 @@ object YDSdk {
         | channel_id  ,
         | dt ,
         | platform  ,
-        | source_type  ,
+        | source_type
         | from vod
       """.stripMargin)
       .as[MidVodDay]
@@ -628,8 +628,8 @@ object YDSdk {
          | select
          |  t.user_id,
          |  p.regionid,
-         |  t.start_time,
-         |  t.end_time,
+         |  t.play_start_time,
+         |  t.play_end_time,
          |  t.media_id,
          |  t.media_name,
          |  t.conf_channel_code,
@@ -637,8 +637,8 @@ object YDSdk {
          |  t.channel_name,
          |  p.apk_version,
          |  p.dt,
-         |  p.operator,
-         |  p.platform
+         |  p.platform,
+         |  p.source_type
          |  from
          |  t , p
          | where t.user_id = p.user_id
@@ -652,13 +652,13 @@ object YDSdk {
          | select
          |   t.user_id,
          |   p.regionid,
-         |   t.start_time,
-         |   t.end_time,
+         |   t.play_start_time,
+         |   t.play_end_time,
          |   t.channel_id,
          |   p.apk_version,
          |   p.dt,
-         |   p.operator,
-         |   p.platform
+         |   p.platform,
+         |   p.source_type
          |  from
          |  t , p
          | where t.user_id = p.user_id
@@ -691,9 +691,10 @@ object YDSdk {
          |   p.apk_version,
          |   t.offset_group,
          |   t.media_group,
+         |   t.create_time,
          |   p.dt,
-         |   p.operator,
-         |   p.platform
+         |   p.platform,
+         |   p.source_type
          |  from
          |  t , p
          | where t.user_id = p.user_id
@@ -719,8 +720,8 @@ object YDSdk {
          |  t.pagepath,
          |  t.nextpagepath,
          |  p.dt,
-         |  p.operator,
-         |  p.platform
+         |  p.platform,
+         |  p.source_type
          |from
          |t , p
          |where t.user_id=p.user_id
@@ -739,8 +740,8 @@ object YDSdk {
          | t.error_detail,
          | t.create_time,
          | p.dt,
-         | p.operator,
-         | p.platform
+         | p.platform,
+         | p.source_type
          |from
          |t , p
          |where t.user_id=p.user_id
