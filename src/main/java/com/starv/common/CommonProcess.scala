@@ -230,15 +230,15 @@ object CommonProcess {
     val endDay = end_time.take(8)
     //开始时间是昨天 结束时间是今天的情况
     if (startDay != dt && endDay == dt) {
-      (dt + "000000", dt + end_time.takeRight(6))
+      (dt + "000000", end_time)
     }
     //开始时间是今天 结束时间是第二天的情况
     else if (startDay == dt && endDay != dt) {
-      (dt + start_time.takeRight(6), dt + "235959")
+      (start_time, dt + "235959")
     }
     //都是今天的数据
     else {
-      (dt + start_time.takeRight(6), dt + end_time.takeRight(6))
+      (start_time, end_time)
     }
   }
 
