@@ -1,5 +1,6 @@
 package com.starv.common
 
+import com.starv.yd.YDConst
 import org.apache.commons.lang3.time.DateUtils
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
@@ -7,7 +8,7 @@ import org.apache.spark.sql.{DataFrame, SaveMode}
   * 通用业务逻辑处理
   *
   * @author zyx 
-  *  2018/5/14.
+  *         2018/5/14.
   */
 object CommonProcess {
 
@@ -192,27 +193,25 @@ object CommonProcess {
     *
     * @param dt 日期
     */
-  def filterSpanDayData(state: String,dt: String, start_time: String, end_time: String): Boolean = {
+  def filterSpanDayData(state: String, dt: String, start_time: String, end_time: String): Boolean = {
     val startDay = start_time.take(8)
     val endDay = end_time.take(8)
     val startTime = DateUtils.parseDate(start_time, "yyyyMMddHHmmss")
     val endTime = DateUtils.parseDate(end_time, "yyyyMMddHHmmss")
     //开始时间是昨天 结束时间也是昨天 || 开始时间是明天 结束时间也是明天 过滤掉
     //过滤3秒-5小时
-    if(state.equals("0x03")){
-      (endTime.getTime / 1000 - startTime.getTime / 1000) >= 3 && (endTime.getTime / 1000 - startTime.getTime /
-        1000) <= 86400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
+    val viewTime = endTime.getTime / 1000 - startTime.getTime / 1000
+    if (state.equals(YDConst.LIVE)) {
+      viewTime >= 3 && viewTime <= 86400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
         && startDay == dt))
-    }else if(state.equals("0x04")){
-      (endTime.getTime / 1000 - startTime.getTime / 1000) >= 3 && (endTime.getTime / 1000 - startTime.getTime /
-        1000) <= 14400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
+    } else if (state.equals(YDConst.VOD)) {
+      viewTime >= 3 && viewTime <= 14400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
         && startDay == dt))
-    }else if(state.equals("0x05")){
-      (endTime.getTime / 1000 - startTime.getTime / 1000) >= 3 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
+    } else if (state.equals(YDConst.LOOK_BACK)) {
+      viewTime >= 3 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
         && startDay == dt))
-    }else{
-      (endTime.getTime / 1000 - startTime.getTime / 1000) >= 3 && (endTime.getTime / 1000 - startTime.getTime /
-        1000) <= 86400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
+    } else {
+      viewTime >= 3 && viewTime <= 86400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
         && startDay == dt))
     }
 
@@ -231,15 +230,15 @@ object CommonProcess {
     val endDay = end_time.take(8)
     //开始时间是昨天 结束时间是今天的情况
     if (startDay != dt && endDay == dt) {
-      ("000000", end_time.takeRight(6))
+      (dt + "000000", dt + end_time.takeRight(6))
     }
     //开始时间是今天 结束时间是第二天的情况
     else if (startDay == dt && endDay != dt) {
-      (start_time.takeRight(6), "235959")
+      (dt + start_time.takeRight(6), dt + "235959")
     }
     //都是今天的数据
     else {
-      (start_time.takeRight(6), end_time.takeRight(6))
+      (dt + start_time.takeRight(6), dt + end_time.takeRight(6))
     }
   }
 
