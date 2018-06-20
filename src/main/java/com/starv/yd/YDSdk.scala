@@ -1,9 +1,12 @@
 package com.starv.yd
 
+import java.text.SimpleDateFormat
+
 import com.starv.SourceTmp
 import com.starv.common.{CommonProcess, MGTVConst}
 import com.starv.utils.{BroadcastUtils, TimeUtils}
 import com.starv.yd.YDConst._
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.collection.mutable.ListBuffer
@@ -12,7 +15,7 @@ import scala.collection.mutable.ListBuffer
   * 无脑入库
   *
   * @author zyx
-  * @date 2018/5/29.
+  *  2018/5/29.
   */
 object YDSdk {
   def main(args: Array[String]): Unit = {
@@ -20,17 +23,22 @@ object YDSdk {
       System.err.println("Usage: dt platform  ")
       System.exit(1)
     }
-    val Array(dt, platform) = args
+    val Array(dt,platform) = args
     MGTVConst.validatePlatform(platform)
 
     val spark = SparkSession.builder()
+
       .config("hive.exec.dynamic.partition", "true")
       .config("hive.exec.dynamic.partition.mode", "nonstrict")
       .appName(s"YDSdk==>$dt")
       .enableHiveSupport()
       .getOrCreate()
+    import spark.implicits._
+    //spark.sparkContext.textFile("C:\\Users\\bigdata\\Desktop\\all.log")
+    val source = spark.sparkContext.textFile(s"/warehouse/HNYD/" + upDate(dt) + s"/0x*/*.log,/warehouse/HNYD/$dt/0x*/*.log,/warehouse/HNYD/" + afterDate(dt) + "/0x*/*.log").toDS()
 
-    spark.sparkContext.textFile("C:\\数据\\芒果\\移动49\\all.log")
+
+    process(source,spark,dt,platform)
   }
 
   /**
@@ -41,12 +49,15 @@ object YDSdk {
     */
   def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String): Unit = {
     val channelMap = BroadcastUtils.getChannelMap(spark)
+    val channelName = BroadcastUtils.getChannelNmae(spark)  //获取频道名称
+    val mediaNameMap = BroadcastUtils.getMediaName(spark,dt)  //获取媒资名称
+    val chanCateMap = BroadcastUtils.getChannelCategory(spark,dt) //频道与栏目对应关系
+    val cateMediaMap = BroadcastUtils.getCategoryMedia(spark,dt) //栏目与节目对应关系
     //昨天
     val yesterday = TimeUtils.plusDay(dt, -1)
     import spark.implicits._
-    files
-      //切割粘连符
-      .flatMap(_.split("\\\\x0A"))
+    //计算直播
+     files.flatMap(_.split("\\\\x0A"))
       .map { x =>
         val data = x.split("\\|", -1)
         data(0) match {
@@ -69,6 +80,7 @@ object YDSdk {
               channel_id = data(7),
               channel_name = data(8),
               live_flag = live_flag,
+              is_timeshift = "0",
               platform = platform,
               source_type = MGTVConst.SDK
             )
@@ -103,14 +115,18 @@ object YDSdk {
           case LOOK_BACK
             if data.length >= 17 && (data(12) == LOOK_BACK_PLAY || data(12) == LOOK_BACK_END) =>
             val conf_channel_code = channelMap.value.getOrElse(data(7), "")
+            val channelname = channelName.value.getOrElse(data(7),"")
             SourceTmp(
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               play = data(12) == LOOK_BACK_PLAY,
+              media_id=data(6),
+              media_name=data(11),
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
               channel_id = data(7),
+              channel_name=channelname,
               platform = platform,
               source_type = MGTVConst.SDK
             )
@@ -141,6 +157,16 @@ object YDSdk {
             */
           case PAGE_VIEW
             if data.length >= 26 =>
+            val mediaName = mediaNameMap.value.getOrElse(data(16),"")
+            val keyword = data(16)
+            var key_name = ""
+            if (StringUtils.isNotEmpty(mediaName) && StringUtils.isNotEmpty(keyword)) {
+              if (mediaName.trim.length < keyword.trim.length) {
+                key_name = mediaName.trim
+              } else {
+                key_name = mediaName.substring(0, keyword.trim.length)
+              }
+            }
             SourceTmp(
               state = data(0),
               user_id = data(2),
@@ -156,6 +182,9 @@ object YDSdk {
               offset_name = data(13),
               offset_id = data(14),
               category_id = data(15),
+              key=data(17),
+              event_type=data(18),
+              keyname=key_name,
               channel_id = data(25),
               offset_group = data(23),
               media_group = data(24),
@@ -185,37 +214,74 @@ object YDSdk {
               platform = platform,
               source_type = MGTVConst.SDK
             )
+          /*
+          0x09|mac|user_id|operator|create_time|sp_code|pagepath|nextpagepath|product_name|product_id|product_price|buy_ok|media_id|media_name|cat_id|play_url|confirmation|status|||channel_id
+          0x09|3C0CDB02898D|004903FF0003431000113C0CDB02898D|003|2017-11-22T15:26:20+0800||com.hunantv.operator/com.fonsview.mangotv.order.OrderActivity||芒果IPTV按次点播1元|799210mg200001|1|00000000000000010000000000333650|伪装者||http://111.8.22.193:80/180000000002/00000000000000010000000000425964/index.m3u8|buy_ok|0|1
+           */
+          //订购
+          case ORDER
+            if data.length >=21 =>
+            SourceTmp(
+              state = data(0),
+              user_id = data(2),
+              create_time = TimeUtils.fastParseSdkDate(data(4)),
+              product_id=data(9),
+              product_name=data(8),
+              product_price=data(10),
+              media_id=data(12),
+              media_name=data(13),
+              //category_id=data(),
+              channel_id=data(20),
+              status=data(17),
+              pagepath=data(6),
+              nextpagepath=data(7),
+              platform = platform,
+              source_type = MGTVConst.SDK
+            )
+
+          case ERROR
+            if data.length >=10 =>
+            SourceTmp(
+              state = data(0),
+              user_id = data(2),
+              create_time = TimeUtils.fastParseSdkDate(data(4)),
+              error_code=data(8),
+              error_detail=data(10),
+              platform = platform,
+              source_type = MGTVConst.SDK
+            )
+
 
           //其他的按心跳处理
           case _ => SourceTmp(
-            state = YDConst.HEART,
+            state = data(0),
             user_id = data(2),
             create_time = TimeUtils.fastParseSdkDate(data(4)),
             platform = platform,
             source_type = MGTVConst.SDK
           )
         }
-      }
+      }.filter(line => {
+      //过滤测试用户
+      val userid = BroadcastUtils.getFilterUserIdPrev(spark,platform).value
+      !line.user_id.take(3).contains(userid)
+    })
+      //过滤栏目名
+//      .filter(line => {
+//      val category = BroadcastUtils.getFilterTestCategory(spark,platform,line.source_type)
+//      if(line.state == "0x04"){
+//        line.category_id
+//      }
+//    })
       .groupByKey(_.user_id)
-      .flatMapGroups((_, dataArray) => {
+      .flatMapGroups((_,dataArray) => {
         val resultList = ListBuffer[SourceTmp]()
         val dataList = dataArray.toList
         var tmp: SourceTmp = null
         val userContext = new YdSDKUserContext(dataList)
-
-        def sortRule(source: SourceTmp): (String, Int) = {
-          //先按时间排序 再按播放类型排序 播放状态的放前面
-          (source.create_time, if (source.play) 0 else 1)
-        }
-
         //根据上下文补充开始结束时间
-        dataList
-          .filter(needComputedDuration)
-          .groupBy(_.state)
-          .foreach(tuple => {
-            tuple._2
-              .sortBy(sortRule)
-              .foreach(data => {
+        dataList.filter(needComputedDuration).groupBy(_.state).foreach(tuple => {
+            tuple._2.sortBy(_.create_time).foreach(data => {
                 if (data.play) {
                   if (tmp != null) {
                     tmp.play_end_time = userContext.getNextEndTime(tmp)
@@ -237,14 +303,14 @@ object YDSdk {
             tmp = null
           })
         //页面浏览
-        resultList ++= dataList.filter(_.state == PAGE_VIEW).filter(_.create_time.startsWith(dt))
+        resultList ++= dataList.filter(_.state == PAGE_VIEW)
         //开机 每个用户只入最后一条
-        val initList = dataList.filter(_.state == INIT).filter(_.create_time.startsWith(dt))
+        val initList = dataList.filter(_.state == INIT)
         if (initList.nonEmpty) {
           resultList += initList.maxBy(_.create_time)
         }
         //任意一条心跳
-        val anyHeartData = dataList.find(x => x.state == HEART && x.create_time.startsWith(dt))
+        val anyHeartData = userContext.getAnyHeartData
         if (anyHeartData.nonEmpty) {
           resultList += anyHeartData.get
         }
@@ -253,7 +319,7 @@ object YDSdk {
       })
       .filter(x => {
         //只有带播放时间的业务需要处理跨天过滤规则
-        if (needComputedDuration(x)) CommonProcess.filterSpanDayData(dt, x.play_start_time, x.play_end_time) else true
+        if (needComputedDuration(x)) CommonProcess.filterSpanDayData(x.state,dt, x.play_start_time, x.play_end_time) else true
       })
       .map(x => {
         if (needComputedDuration(x)) {
@@ -265,6 +331,7 @@ object YDSdk {
       })
       .createOrReplaceTempView("t")
 
+
     spark.sqlContext.cacheTable("t")
     val live = LIVE
     val init = INIT
@@ -272,6 +339,8 @@ object YDSdk {
     val lookBack = LOOK_BACK
     val timeShift = TIME_SHIFT
     val pageView = PAGE_VIEW
+    val order = ORDER
+    val error = ERROR
     val source_type = MGTVConst.SDK
 
     //活跃 o
@@ -286,6 +355,8 @@ object YDSdk {
          |   max(manufacturers) as manufacturers,
          |   max(user_account) as user_account,
          |   max(system_version) as system_version,
+         |   max(ip) as ip,
+         |   max(os) as os,
          |   '$dt' as dt,
          |   '$platform' as platform,
          |   max(source_type) as source_type
@@ -321,7 +392,7 @@ object YDSdk {
 
     //入库今天的池表 上面的是新数据 下面是旧数据
 
-    spark.sql(
+     spark.sql(
       s"""
          |
          |  SELECT
@@ -402,14 +473,18 @@ object YDSdk {
     //直播
     df = spark.sql(
       s"""
+         | insert overwrite table owlx.mid_chnl_day
          | select
          |  t.user_id,
-         |  p.area_code,
+         |  p.regionid,
          |  t.play_start_time,
          |  t.play_end_time,
          |  t.channel_id,
          |  t.channel_name,
-         |  t.source_channel_info,
+         |  t.conf_channel_code,
+         |  p.apk_version,
+         |  t.live_flag,
+         |  t.is_timeshift,
          |  p.dt,
          |  p.operator,
          |  p.platform
@@ -417,11 +492,180 @@ object YDSdk {
          | t , p
          | where t.user_id = p.user_id
          | and t.state = '$live'
+         | UNION ALL
+         | select
+         |   t.user_id,
+         |   p.regionid,
+         |   t.start_time,
+         |   t.end_time,
+         |   t.channel_id,
+         |   '',
+         |   '',
+         |   p.apk_version,
+         |   '',
+         |   '1',
+         |   p.dt,
+         |   p.operator,
+         |   p.platform
+         |  from
+         |  t , p
+         | where t.user_id = p.user_id
+         | and t.state = '$timeShift'
          |
       """.stripMargin)
-    CommonProcess.overwriteTable(df, "owlx.mid_chnl_day")
+    //CommonProcess.overwriteTable(df, "owlx.mid_chnl_day")
 
-    //todo 后面还没写完
+
+    //点播
+    spark.sql(
+      s"""
+         | insert overwrite table owlx.mid_vod_day
+         | select
+         |   t.user_id ,
+         |   p.regionid  ,
+         |   t.start_time ,
+         |   t.end_time ,
+         |   t.media_id ,
+         |   t.media_name  ,
+         |   t.category_id  ,
+         |   p.apk_version,
+         |   t.channel_id,
+         |   p.dt,
+         |   p.operator,
+         |   p.platform
+         |  from
+         |  t , p
+         | where t.user_id = p.user_id
+         | and t.state = '$vod'
+         |
+      """.stripMargin)
+
+
+    //回看
+    spark.sql(
+      s"""
+         | insert overwrite table owlx.mid_tvod_day
+         | select
+         |  t.user_id,
+         |  p.regionid,
+         |  t.start_time,
+         |  t.end_time,
+         |  t.media_id,
+         |  t.media_name,
+         |  t.conf_channel_code,
+         |  t.channel_id,
+         |  t.channel_name,
+         |  p.apk_version,
+         |  p.dt,
+         |  p.operator,
+         |  p.platform
+         |  from
+         |  t , p
+         | where t.user_id = p.user_id
+         | and t.state = '$lookBack'
+         |
+      """.stripMargin)
+    //时移
+    spark.sql(
+      s"""
+         | insert overwrite table owlx.mid_timeshift_day
+         | select
+         |   t.user_id,
+         |   p.regionid,
+         |   t.start_time,
+         |   t.end_time,
+         |   t.channel_id,
+         |   p.apk_version,
+         |   p.dt,
+         |   p.operator,
+         |   p.platform
+         |  from
+         |  t , p
+         | where t.user_id = p.user_id
+         | and t.state = '$timeShift'
+         |
+      """.stripMargin)
+    //页面访问
+    spark.sql(
+      s"""
+         | insert overwrite table owlx.mid_pageview_day
+         | select
+         |   t.user_id,
+         |   p.regionid,
+         |   t.sp_code,
+         |   t.pagepath,
+         |   t.nextpagepath ,
+         |   t.pagename ,
+         |   t.event_type ,
+         |   t.special_id ,
+         |   t.page_id ,
+         |   t.way ,
+         |   t.offset_name,
+         |   t.offset_id,
+         |   t.key,
+         |   t.keyname,
+         |   t.media_id,
+         |   t.media_name,
+         |   t.category_id,
+         |   t.channel_id,
+         |   p.apk_version,
+         |   t.offset_group,
+         |   t.media_group,
+         |   p.dt,
+         |   p.operator,
+         |   p.platform
+         |  from
+         |  t , p
+         | where t.user_id = p.user_id
+         | and t.state = '$pageView'
+         |
+      """.stripMargin)
+
+    //订购
+    spark.sql(
+      s"""
+         |insert overwrite table owlx.mid_order_day
+         |select
+         |  t.user_id,
+         |  t.product_id,
+         |  t.product_name,
+         |  t.product_price,
+         |  t.media_id,
+         |  t.media_name,
+         |  t.category_id,
+         |  t.channel_id,
+         |  t.status,
+         |  t.create_time,
+         |  t.pagepath,
+         |  t.nextpagepath,
+         |  p.dt,
+         |  p.operator,
+         |  p.platform
+         |from
+         |t , p
+         |where t.user_id=p.user_id
+         |and t.state='$order'
+      """.stripMargin)
+
+
+    //错误
+    spark.sql(
+      s"""
+        |insert overwrite table owlx.mid_error_day
+        |select
+        | p.apk_version,
+        | t.user_id,
+        | t.error_code,
+        | t.error_detail,
+        | t.create_time,
+        | p.dt,
+        | p.operator,
+        | p.platform
+        |from
+        |t , p
+        |where t.user_id=p.user_id
+        |and t.state='$error'
+      """.stripMargin)
 
     spark.sqlContext.uncacheTable("t")
     spark.sqlContext.uncacheTable("p")
@@ -438,4 +682,17 @@ object YDSdk {
   def notHeartAndInit(tmp: SourceTmp): Boolean = {
     tmp.state != HEART && tmp.state != INIT
   }
+
+  def upDate(orignDate: String): String = {
+    val df = new SimpleDateFormat("yyyyMMdd")
+    val now = df.parse(orignDate).getTime - 24 * 60 * 60 * 1000
+    df.format(now)
+  }
+
+  def afterDate(aftDate: String): String = {
+    val df = new SimpleDateFormat("yyyyMMdd")
+    val now = df.parse(aftDate).getTime + 24 * 60 * 60 * 1000
+    df.format(now)
+  }
+
 }

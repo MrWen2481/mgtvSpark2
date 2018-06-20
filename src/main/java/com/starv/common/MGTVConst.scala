@@ -2,7 +2,7 @@ package com.starv.common
 
 /**
   * @author zyx 
-  * @date 2018/5/29.
+  *  2018/5/29.
   */
 object MGTVConst {
   val HNLT = "HNLT"

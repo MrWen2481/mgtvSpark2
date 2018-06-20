@@ -7,7 +7,7 @@ import java.util.Properties
 /**
   * 模仿spring boot的做法..
   * @author zyx 
-  * @date 2018/4/20.
+  *  2018/4/20.
   */
 object StarvConfig {
 

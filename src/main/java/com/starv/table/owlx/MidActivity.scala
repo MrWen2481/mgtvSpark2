@@ -1,7 +1,7 @@
 package com.starv.table.owlx
 /**
  * @author zyx
- * @date 2018/5/30.
+ *  2018/5/30.
  */
 case class MidActivity (
      userid:String,

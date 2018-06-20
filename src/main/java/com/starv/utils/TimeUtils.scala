@@ -7,7 +7,7 @@ import org.apache.commons.lang3.time.{DateFormatUtils, DateUtils}
 
 /**
   * @author zyx 
-  * @date 2018/3/26.
+  *  2018/3/26.
   */
 object TimeUtils {
 

@@ -10,7 +10,7 @@ import scala.collection.JavaConversions.asJavaCollection
   * 移动用户上下文
   *
   * @author zyx 
-  * @date 2018/5/25.
+  * 2018/5/25.
   */
 class YdSDKUserContext(dataList: List[SourceTmp]) {
   //心跳的时间
@@ -22,9 +22,7 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
 
   heartCreateTimeSet.addAll(dataList.filter(_.state == YDConst.HEART).map(_.create_time))
   initTimeSet.addAll(dataList.filter(_.state == YDConst.INIT).map(_.create_time))
-  businessTimeSet.addAll(dataList
-    .filter(_.play)
-    .map(_.create_time))
+  businessTimeSet.addAll(dataList.filter(_.play).map(_.create_time))
 
   def getNextEndTime(tmp: SourceTmp): String = {
     var endTime = businessTimeSet.higher(tmp.play_start_time)
@@ -64,4 +62,11 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
     endTime
   }
 
+  //随便获取一条心跳数据 取活跃用户数时使用
+  def getAnyHeartData: Option[SourceTmp] = {
+    if (!heartCreateTimeSet.isEmpty) {
+      Option.apply(heartCreateTimeSet.last())
+    }
+    Option.empty
+  }
 }
