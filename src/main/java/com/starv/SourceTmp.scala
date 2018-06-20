@@ -4,7 +4,7 @@ package com.starv
   * 原始数据中的所有字段
   *
   * @author zyx 
-  * @date 2018/5/29.
+  *  2018/5/29.
   */
 case class SourceTmp(
                       //业务状态
@@ -16,6 +16,7 @@ case class SourceTmp(
                       var play_end_time: String = "",
                       conf_channel_code: String = "",
                       live_flag: String = "",
+                      is_timeshift: String = "0",
                       vod_flag: String = "",
                       play: Boolean = false,
                       manufacturers: String = "",
@@ -42,6 +43,7 @@ case class SourceTmp(
                       offset_name: String = "",
                       offset_id: String = "",
                       key: String = "",
+                      keyname: String = "",
                       event_type: String = "",
                       button_id: String = "",
                       button_name: String = "",
@@ -49,6 +51,13 @@ case class SourceTmp(
                       media_group: String = "",
                       channel_id: String = "",
                       channel_name: String = "",
-                      platform: String,
-                      source_type: String
+                      platform: String ="",
+                      source_type: String ="",
+                      operator: String ="",
+                      product_name: String ="",
+                      product_id: String ="",
+                      product_price: String ="",
+                      status: String ="",
+                      error_code: String ="",
+                      error_detail: String =""
                     )
