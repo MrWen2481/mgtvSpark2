@@ -262,7 +262,7 @@ object YDSdk {
 
           //其他的按心跳处理
           case _ => SourceTmp(
-            state = data(0),
+            state = YDConst.HEART,
             user_id = data(2),
             create_time = TimeUtils.fastParseSdkDate(data(4)),
             platform = platform,
