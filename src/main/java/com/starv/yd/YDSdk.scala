@@ -236,7 +236,7 @@ object YDSdk {
               product_price = data(10),
               media_id = data(12),
               media_name = data(13),
-              category_id=data(14),
+              category_id = data(14),
               channel_id = data(20),
               status = data(17),
               pagepath = data(6),
@@ -244,15 +244,17 @@ object YDSdk {
               platform = platform,
               source_type = MGTVConst.SDK
             )
-
+          /*
+            测试数据只有9位
+            0x11|0C4933BF62FB|004903FF0003204018170C4933BF62FB|003|2018-05-21T19:12:18+0800||com.hunantv.operator/com.fonsview.mangotv.MainActivity||1003009||
+           */
           case ERROR
-            if data.length >= 10 =>
+            if data.length >= 9 =>
             SourceTmp(
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               error_code = data(8),
-              error_detail=data(10),
               platform = platform,
               source_type = MGTVConst.SDK
             )
@@ -545,10 +547,8 @@ object YDSdk {
         | from vod
       """.stripMargin)
       .as[MidVodDay]
-      .groupByKey(x => (x.uuid, x.play_start_time, x.play_end_time, x.media_id, x.channel_id, x.category_id))
-      .flatMapGroups((_, x) => {
+      .flatMap(midVod => {
         val resVodList = ListBuffer[ResVodDay]()
-        val midVod = x.toList.head
 
         val resVodDay = ResVodDay(
           uuid = midVod.uuid,

@@ -125,7 +125,7 @@ object BroadcastUtils {
     //identityno 代表的一个栏目和频道的关系
     val keys = session.sql(
       s"""
-        |  select distinct 	identityno,c_cid,	pc_cid media_id,category_id
+        |  select distinct 	identityno,c_cid,	pc_cid
         |  from
         |  hnyd.db_fonsview_category
         |  where
