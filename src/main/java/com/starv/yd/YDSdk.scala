@@ -57,6 +57,7 @@ object YDSdk {
     val vodCategoryNameMap = BroadcastUtils.getCategoryNameMap(spark, dt, platform, MGTVConst.SDK)
     val vodChannelIdMap = BroadcastUtils.getChannelIdByMediaIdAndCategoryIdMap(spark, dt, platform, MGTVConst.SDK) //  //获取频道id 根据媒资id和栏目id   一对一
     val vodCategoryIdMap = BroadcastUtils.getCategoryIdByMediaIdMap(spark, dt, platform, MGTVConst.SDK) //栏目与节目对应关系
+    val ydCategoryIdAndChannelIdMap = BroadcastUtils.getYdCategoryIdAndChannelIdByUploadCategoryId(spark,dt)
     val testCategoryNameList = BroadcastUtils.getFilterTestCategory(spark, platform, MGTVConst.SDK)
     val testUserList = BroadcastUtils.getFilterUserIdPrev(spark, platform)
     //昨天
@@ -566,49 +567,54 @@ object YDSdk {
         val media_name: String = resVodDay.media_name
         val media_id: String = resVodDay.media_id
         val category_id: String = resVodDay.category_id
-        val channel_id: String = resVodDay.channel_id
+
+        // 根据媒资id匹配栏目id和频道id
+        def fillMatchCategoryData() = {
+          for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
+            val resVodTmp = resVodDay.copy()
+            resVodTmp.category_id = categoryId
+            resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+            resVodList += resVodTmp
+          }
+        }
         //如果没有上报媒资名称 取一下媒资库中的数据
         if (StringUtils.isEmpty(media_name)) {
           resVodDay.media_name = mediaNameMap.value.getOrElse(media_id, "")
         }
-        //没有频道id
-        if (StringUtils.isEmpty(channel_id)) {
-          // 有栏目id
-          if (StringUtils.isNotBlank(category_id)) {
-            val channelId = vodChannelIdMap.value.getOrElse((media_id, category_id), "")
-            resVodDay.channel_id = channelId
-            resVodList += resVodDay
-            //没有栏目id
-          } else {
-            for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
-              val resVodTmp = resVodDay.copy()
-              resVodTmp.category_id = categoryId
-              resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
-              resVodList += resVodTmp
-            }
-          }
+        //没有上报栏目id
+        if (StringUtils.isEmpty(category_id)) {
+          fillMatchCategoryData()
         } else {
-          // 暂时认为只要有频道id 就有栏目id 所以不做任何处理
+          //通过上报的栏目id获取真实的栏目id和频道id
+          val option = ydCategoryIdAndChannelIdMap.value.get(category_id)
+          if (option.nonEmpty) {
+            val categoryIdAndChannelId = option.get
+            resVodDay.category_id = categoryIdAndChannelId._1
+            resVodDay.channel_id = categoryIdAndChannelId._2
+          } else {
+            //上报的栏目id 匹配不到结果的话
+            fillMatchCategoryData()
+          }
           resVodList += resVodDay
         }
 
         //审片栏目和 flag业务逻辑计算
         resVodList.foreach(data => {
           data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
-          data.category_name = vodChannelNameMap.value.getOrElse(data.category_id, "")
+          data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
           val breaks = new Breaks
           breaks.breakable({
             for (elem <- testCategoryNameList.value) {
               if (data.category_name.startsWith(elem)) {
-                data.flag = "2"
+                data.flag = MGTVConst.VOD_FILTER_FLAG
                 breaks.break()
               }
             }
           })
         })
-        val maybeVodDay = resVodList.find(_.flag != "2")
+        val maybeVodDay = resVodList.find(_.flag != MGTVConst.VOD_FILTER_FLAG)
         if (maybeVodDay.nonEmpty) {
-          maybeVodDay.get.flag = "0"
+          maybeVodDay.get.flag = MGTVConst.VOD_PROGRAM_FLAG
         }
         resVodList
       })

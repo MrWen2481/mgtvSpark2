@@ -17,6 +17,9 @@ object MGTVConst {
     if (!(HNLT == platform || HNYD == platform || HNDX == platform)) {
         throw new Exception("平台参数错误")
     }
-
   }
+
+  val VOD_FILTER_FLAG = "2"
+  val VOD_PROGRAM_FLAG = "0"
+  val VOD_MATCH_CATEGORY_FLAG = "1"
 }

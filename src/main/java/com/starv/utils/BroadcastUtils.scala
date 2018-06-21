@@ -117,6 +117,28 @@ object BroadcastUtils {
     session.sparkContext.broadcast(keys)
   }
 
+  //根据移动上报的点播栏目id获取真实的栏目id和节目id(category_id,channel_id)
+  def getYdCategoryIdAndChannelIdByUploadCategoryId(session: SparkSession, dt: String): Broadcast[Map[String, (String,String)]] = {
+    import session.implicits._
+    //identityno 上报栏目id 真实的 c_cid 栏目id pc_cid频道
+    //identityno 代表的一个栏目和频道的关系
+    val keys = session.sql(
+      s"""
+        |  select distinct 	identityno,c_cid,	pc_cid media_id,category_id
+        |  from
+        |  hnyd.db_fonsview_category
+        |  where
+        |  dt = '$dt'
+        |  where identityno is not null
+        |
+      """.stripMargin)
+      .map(keys => (keys.getString(0), (keys.getString(1),keys.getString(2))))
+      .collect()
+      .toMap
+    session.sparkContext.broadcast(keys)
+  }
+
+
   //需要过滤的用户id前缀
   def getFilterUserIdPrev(session: SparkSession, platform: String): Broadcast[List[String]] = {
     import session.implicits._
@@ -132,8 +154,6 @@ object BroadcastUtils {
       .collect()
       .toList
     session.sparkContext.broadcast(collect)
-
-
   }
 
   //需要过滤栏目的名称
