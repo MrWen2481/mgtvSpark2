@@ -6,9 +6,10 @@ import org.apache.spark.sql.SparkSession
 
 
 /**
-  * @author zyx 
+  * 广播变量字典声明
+  * @author zyx
   *
-  **/
+  */
 object BroadcastUtils {
 
   def getChannelName(session: SparkSession): Broadcast[Map[String, String]] = {
@@ -129,7 +130,7 @@ object BroadcastUtils {
         |  hnyd.db_fonsview_category
         |  where
         |  dt = '$dt'
-        |  where identityno is not null
+        |  and identityno is not null
         |
       """.stripMargin)
       .map(keys => (keys.getString(0), (keys.getString(1),keys.getString(2))))

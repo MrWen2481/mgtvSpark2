@@ -57,13 +57,12 @@ object YDSdk {
     val vodCategoryNameMap = BroadcastUtils.getCategoryNameMap(spark, dt, platform, MGTVConst.SDK)
     val vodChannelIdMap = BroadcastUtils.getChannelIdByMediaIdAndCategoryIdMap(spark, dt, platform, MGTVConst.SDK) //  //获取频道id 根据媒资id和栏目id   一对一
     val vodCategoryIdMap = BroadcastUtils.getCategoryIdByMediaIdMap(spark, dt, platform, MGTVConst.SDK) //栏目与节目对应关系
-    val ydCategoryIdAndChannelIdMap = BroadcastUtils.getYdCategoryIdAndChannelIdByUploadCategoryId(spark,dt)
+    val ydCategoryIdAndChannelIdMap = BroadcastUtils.getYdCategoryIdAndChannelIdByUploadCategoryId(spark, dt)
     val testCategoryNameList = BroadcastUtils.getFilterTestCategory(spark, platform, MGTVConst.SDK)
     val testUserList = BroadcastUtils.getFilterUserIdPrev(spark, platform)
     //昨天
     val yesterday = TimeUtils.plusDay(dt, -1)
     import spark.implicits._
-    //计算直播
     files.flatMap(_.split("\\\\x0A"))
       .map { x =>
         val data = x.split("\\|", -1)
@@ -267,15 +266,16 @@ object YDSdk {
             source_type = MGTVConst.SDK
           )
         }
-      }.filter(source => {
-      //过滤测试用户
-      for (elem <- testUserList.value) {
-        if (source.user_id.startsWith(elem)) {
-          false
-        }
       }
-      true
-    })
+      .filter(source => {
+        //过滤测试用户
+        for (elem <- testUserList.value) {
+          if (source.user_id.startsWith(elem)) {
+            false
+          }
+        }
+        true
+      })
       .groupByKey(_.user_id)
       .flatMapGroups((_, dataArray) => {
         val resultList = ListBuffer[SourceTmp]()
@@ -577,6 +577,7 @@ object YDSdk {
             resVodList += resVodTmp
           }
         }
+
         //如果没有上报媒资名称 取一下媒资库中的数据
         if (StringUtils.isEmpty(media_name)) {
           resVodDay.media_name = mediaNameMap.value.getOrElse(media_id, "")
@@ -592,7 +593,7 @@ object YDSdk {
             resVodDay.category_id = categoryIdAndChannelId._1
             resVodDay.channel_id = categoryIdAndChannelId._2
           } else {
-            //上报的栏目id 匹配不到结果的话
+            //上报的栏目id 匹配不到结果的话 老套路 根据媒资id匹配去
             fillMatchCategoryData()
           }
           resVodList += resVodDay
