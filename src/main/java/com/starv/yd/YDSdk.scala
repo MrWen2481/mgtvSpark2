@@ -101,13 +101,13 @@ object YDSdk {
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
-              play = data(8) == VOD_PLAY,
+              play = data(17) == VOD_PLAY,
               //这里存的是频道id
               media_id = data(6),
               media_name = data(7),
               episodes = data(8),
-              category_id = data(8),
-              vod_channel_id = data(22),
+              category_id = data(11),
+              channel_id = data(22),
               platform = platform,
               source_type = MGTVConst.SDK
             )

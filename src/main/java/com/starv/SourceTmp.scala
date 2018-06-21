@@ -30,7 +30,6 @@ case class SourceTmp(
                       episodes: String = "",
                       category_id: String = "",
                       sdk_version: String = "",
-                      vod_channel_id: String = "",
                       os: String = "",
                       apk_version: String = "",
                       sp_code: String = "",
