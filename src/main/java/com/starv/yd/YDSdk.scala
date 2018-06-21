@@ -36,8 +36,8 @@ object YDSdk {
       .enableHiveSupport()
       .getOrCreate()
     import spark.implicits._
-    //spark.sparkContext.textFile("C:\\Users\\bigdata\\Desktop\\all.log")
-    val source = spark.sparkContext.textFile(s"/warehouse/HNYD/" + upDate(dt) + s"/0x*/*.log,/warehouse/HNYD/$dt/0x*/*.log,/warehouse/HNYD/" + afterDate(dt) + "/0x*/*.log").toDS()
+
+    val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + s"/*.log,/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*.log").toDS()
 
 
     process(source, spark, dt, platform)
@@ -236,7 +236,7 @@ object YDSdk {
               product_price = data(10),
               media_id = data(12),
               media_name = data(13),
-              //category_id=data(),
+              category_id=data(14),
               channel_id = data(20),
               status = data(17),
               pagepath = data(6),
@@ -252,6 +252,7 @@ object YDSdk {
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               error_code = data(8),
+              error_detail=data(10),
               platform = platform,
               source_type = MGTVConst.SDK
             )
