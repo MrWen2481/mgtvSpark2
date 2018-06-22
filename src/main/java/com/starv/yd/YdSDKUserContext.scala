@@ -62,11 +62,4 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
     endTime
   }
 
-  //随便获取一条心跳数据 取活跃用户数时使用
-  def getAnyHeartData: Option[SourceTmp] = {
-    if (!heartCreateTimeSet.isEmpty) {
-      Option.apply(heartCreateTimeSet.last())
-    }
-    Option.empty
-  }
 }

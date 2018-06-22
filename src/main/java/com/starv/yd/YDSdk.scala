@@ -75,6 +75,7 @@ object YDSdk {
           case LIVE
             if data.length >= 15 && (data(11) == LIVE_PLAY || data(11) == LIVE_END) =>
             val conf_channel_code = channelMap.value.getOrElse(data(7), "")
+            val channelName = channelNameMap.value.getOrElse(data(7), "")
             val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
               state = data(0),
@@ -84,7 +85,7 @@ object YDSdk {
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
               channel_id = data(7),
-              channel_name = data(8),
+              channel_name = channelName,
               live_flag = live_flag,
               platform = platform,
               source_type = MGTVConst.SDK
@@ -120,7 +121,7 @@ object YDSdk {
           case LOOK_BACK
             if data.length >= 17 && (data(12) == LOOK_BACK_PLAY || data(12) == LOOK_BACK_END) =>
             val conf_channel_code = channelMap.value.getOrElse(data(7), "")
-            val channelname = channelNameMap.value.getOrElse(data(7), "")
+            val channelName = channelNameMap.value.getOrElse(data(7), "")
             SourceTmp(
               state = data(0),
               user_id = data(2),
@@ -131,7 +132,7 @@ object YDSdk {
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
               channel_id = data(7),
-              channel_name = channelname,
+              channel_name = channelName,
               platform = platform,
               source_type = MGTVConst.SDK
             )
@@ -308,17 +309,14 @@ object YDSdk {
           }
           tmp = null
         })
-        //页面浏览
-        resultList ++= dataList.filter(_.state == PAGE_VIEW).filter(_.create_time.startsWith(dt))
+        //页面浏览 和 错误
+        resultList ++= dataList.filter(x => x.state == PAGE_VIEW || x.state == ERROR || x.state == ORDER)
+          .filter(_.create_time.startsWith(dt))
+
         //开机 每个用户只入最后一条
         val initList = dataList.filter(_.state == INIT).filter(_.create_time.startsWith(dt))
         if (initList.nonEmpty) {
           resultList += initList.maxBy(_.create_time)
-        }
-        //任意一条心跳
-        val anyHeartData = userContext.getAnyHeartData
-        if (anyHeartData.nonEmpty) {
-          resultList += anyHeartData.get
         }
 
         resultList
@@ -740,20 +738,20 @@ object YDSdk {
     //错误
     spark.sql(
       s"""
-         |insert overwrite table owlx.mid_error_day
-         |select
-         | p.apk_version,
-         | t.user_id,
-         | t.error_code,
-         | t.error_detail,
-         | t.create_time,
-         | p.dt,
-         | p.platform,
-         | p.source_type
-         |from
-         |t , p
-         |where t.user_id=p.user_id
-         |and t.state='$error'
+         |  insert overwrite table owlx.mid_error_day
+         |  select
+         |   p.apk_version,
+         |   t.user_id,
+         |   t.error_code,
+         |   t.error_detail,
+         |   t.create_time,
+         |   p.dt,
+         |   p.platform,
+         |   p.source_type
+         |  from
+         |  t , p
+         |  where t.user_id = p.user_id
+         |  and t.state='$error'
       """.stripMargin)
 
     spark.sqlContext.uncacheTable("t")
