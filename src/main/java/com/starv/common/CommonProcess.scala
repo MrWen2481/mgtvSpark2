@@ -201,20 +201,19 @@ object CommonProcess {
     //开始时间是昨天 结束时间也是昨天 || 开始时间是明天 结束时间也是明天 过滤掉
     //过滤3秒-5小时
     val viewTime = endTime.getTime / 1000 - startTime.getTime / 1000
-    if (state.equals(YDConst.LIVE)) {
-      viewTime >= 3 && viewTime <= 86400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
-        && startDay == dt))
-    } else if (state.equals(YDConst.VOD)) {
-      viewTime >= 3 && viewTime <= 14400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
-        && startDay == dt))
-    } else if (state.equals(YDConst.LOOK_BACK)) {
-      viewTime >= 3 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
-        && startDay == dt))
-    } else {
-      viewTime >= 3 && viewTime <= 86400 && ((endDay == dt && startDay < dt) || (endDay == startDay && startDay == dt) || (endDay > dt
-        && startDay == dt))
-    }
+    viewTime >= 3 && viewTime <= getMaxViewTimeFilterTimeByState(state) && ((endDay == dt && startDay < dt) || (endDay ==
+      startDay && startDay == dt) || (endDay > dt && startDay == dt))
 
+  }
+
+  def getMaxViewTimeFilterTimeByState(state: String): Int = {
+    if (state == YDConst.VOD) {
+      14400
+    } else if (state == YDConst.LOOK_BACK) {
+      Int.MaxValue
+    } else { //LIVE OR TIME_SHIFT
+      86400
+    }
   }
 
   /**

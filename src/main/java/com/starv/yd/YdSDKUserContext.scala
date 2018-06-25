@@ -3,14 +3,16 @@ package com.starv.yd
 import java.util
 
 import com.starv.SourceTmp
+import com.starv.common.CommonProcess
 import com.starv.utils.TimeUtils
+
 import scala.collection.JavaConversions.asJavaCollection
 
 /**
   * 移动用户上下文
   *
   * @author zyx 
-  * 2018/5/25.
+  *         2018/5/25.
   */
 class YdSDKUserContext(dataList: List[SourceTmp]) {
   //心跳的时间
@@ -43,8 +45,9 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
       }
 
     }
-    //判断相隔时长是否大于5小时
-    if (TimeUtils.getDateTimeDuration(tmp.play_start_time, endTime) > 60 * 60 * 5) {
+    //判断相隔时长是否大于过滤时间
+    if (TimeUtils.getDateTimeDuration(tmp.play_start_time, endTime) >
+      CommonProcess.getMaxViewTimeFilterTimeByState(tmp.state)) {
       return TimeUtils.plusMinute(tmp.play_start_time, 5)
     }
     //这里还要判断一下是否重新开过机
