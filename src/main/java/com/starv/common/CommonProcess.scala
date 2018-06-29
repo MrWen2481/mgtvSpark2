@@ -1,6 +1,7 @@
 package com.starv.common
 
 import com.starv.yd.YDConst
+import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateUtils
 import org.apache.spark.sql.{DataFrame, SaveMode}
 
@@ -14,6 +15,15 @@ object CommonProcess {
 
   def get(data: Array[String], index: Int): String = {
     if (index > data.length - 1) "" else data(index)
+  }
+
+  def filterTestUser(userId: String, testUserSet: List[String]): Boolean = {
+    for (elem <- testUserSet) {
+      if (StringUtils.startsWith(userId, elem)) {
+        return false
+      }
+    }
+    true
   }
 
 
