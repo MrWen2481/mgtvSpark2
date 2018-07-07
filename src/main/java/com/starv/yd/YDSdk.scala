@@ -1,6 +1,7 @@
 package com.starv.yd
 
 import java.text.SimpleDateFormat
+import java.util.regex.Pattern
 
 import com.starv.SourceTmp
 import com.starv.common.{CommonProcess, MGTVConst}
@@ -11,6 +12,7 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 import scala.util.control.Breaks
 
 /**
@@ -63,7 +65,15 @@ object YDSdk {
     //昨天
     val yesterday = TimeUtils.plusDay(dt, -1)
     import spark.implicits._
-    files.flatMap(_.split("\\\\x0A"))
+    files.flatMap(_.split("\\\\x0A")).filter(x => {
+      //过滤时间格式错乱数据
+      val keys = x.split("\\|",-1)
+      if (keys(0).equals(INIT)){
+        Try(TimeUtils.fastParseSdkDate(keys(12))).isSuccess
+      }else{
+        Try(TimeUtils.fastParseSdkDate(keys(4))).isSuccess
+      }
+    })
       .map { x =>
         val data = x.split("\\|", -1)
         data(0) match {
@@ -232,7 +242,7 @@ object YDSdk {
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
-              product_id = data(9),
+              boss_id = data(9),
               product_name = data(8),
               product_price = data(10),
               media_id = data(12),
@@ -524,8 +534,59 @@ object YDSdk {
          |
       """.stripMargin)
       .createOrReplaceTempView("vod")
-    spark.sqlContext.cacheTable("vod")
-    spark.sql("insert overwrite table owlx.mid_vod_day select * from vod")
+
+
+    spark.sql(
+      s"""
+         |
+         |select
+         |   a.uuid,
+         |   a.regionid ,
+         |   a.play_start_time ,
+         |   a.play_end_time ,
+         |   a.media_id ,
+         |   a.media_name  ,
+         |   a.category_id  ,
+         |   a.apk_version,
+         |   a.channel_id,
+         |   MD5(concat(a.assetid,b.originalid)) as media_uuid,
+         |   a.media_second_name,
+         |   a.assetid,
+         |   nvl(b.originalid,'') as orgin_id,
+         |   a.dt,
+         |   a.platform,
+         |   a.source_type
+         |from (
+         |select
+         |   v.uuid,
+         |   v.regionid ,
+         |   v.play_start_time ,
+         |   v.play_end_time ,
+         |   v.media_id ,
+         |   v.media_name  ,
+         |   v.category_id  ,
+         |   v.apk_version,
+         |   v.channel_id,
+         |   nvl(m.name,'') as media_second_name,
+         |   nvl(m.assetid,'') as assetid,
+         |   v.dt,
+         |   v.platform,
+         |   v.source_type
+         |   from vod v,
+         |(select contentid,name,assetid from hnyd.db_fonsview_vod where dt='$dt') m
+         |  where v.media_id = m.contentid) a
+         |  left join
+         |  (select assetid,originalid from owlx.db_smedia_vodinfomation  where dt= '$dt') b
+         |  on a.assetid=b.assetid
+         |
+       """.stripMargin).createOrReplaceTempView("addvod")
+    spark.sqlContext.cacheTable("addvod")
+
+    spark.sql(
+      """
+        |insert overwrite table owlx.mid_vod_day
+        |select * from addvod
+      """.stripMargin)
 
     spark.sql(
       """
@@ -538,11 +599,12 @@ object YDSdk {
         | media_name  ,
         | category_id  ,
         | apk_version  ,
+        | media_uuid  ,
         | channel_id  ,
         | dt ,
         | platform  ,
         | source_type
-        | from vod
+        | from addvod
       """.stripMargin)
       .as[MidVodDay]
       .flatMap(midVod => {
@@ -554,6 +616,7 @@ object YDSdk {
           play_start_time = midVod.play_start_time,
           play_end_time = midVod.play_end_time,
           apk_version = midVod.apk_version,
+          media_uuid = midVod.media_uuid,
           media_id = midVod.media_id,
           media_name = midVod.media_name,
           channel_id = midVod.channel_id,
@@ -625,7 +688,7 @@ object YDSdk {
         | insert overwrite table owlx.res_vod_day
         | select * from res_vod_tmp
       """.stripMargin)
-    spark.sqlContext.uncacheTable("vod")
+    spark.sqlContext.uncacheTable("addvod")
 
     //回看
     spark.sql(
@@ -708,31 +771,46 @@ object YDSdk {
          |
       """.stripMargin)
 
+    //正则获取大版本apkVersion
+    spark.udf.register("parent_apk", func = (apkVersion: String) => {
+      val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
+      val matcher = pattern.matcher(apkVersion)
+      if (matcher.find())
+        matcher.group(1)
+      else
+        ""
+    })
+
+
     //订购
     spark.sql(
       s"""
          |insert overwrite table owlx.mid_order_day
          |select
          |  t.user_id,
-         |  t.product_id,
+         |  t.boss_id,
+         |   '',
+         |  t.status,
+         |  p.apk_version,
+         |  parent_apk(p.apk_version),
+         |  t.create_time,
          |  t.product_name,
          |  t.product_price,
          |  t.media_id,
          |  t.media_name,
          |  t.category_id,
          |  t.channel_id,
-         |  t.status,
-         |  t.create_time,
          |  t.pagepath,
          |  t.nextpagepath,
          |  p.dt,
          |  p.platform,
-         |  p.source_type
+         |  t.source_type
          |from
          |t , p
          |where t.user_id=p.user_id
          |and t.state='$order'
       """.stripMargin)
+
 
 
     //错误

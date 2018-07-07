@@ -54,7 +54,7 @@ case class SourceTmp(
                       source_type: String ="",
                       operator: String ="",
                       product_name: String ="",
-                      product_id: String ="",
+                      boss_id: String ="",
                       product_price: String ="",
                       status: String ="",
                       error_code: String ="",

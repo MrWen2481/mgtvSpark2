@@ -12,6 +12,7 @@ case class MidVodDay (
      var media_name:String,
      var category_id:String,
      apk_version:String,
+     media_uuid:String,
      var channel_id:String,
      dt:String,
      platform:String,
