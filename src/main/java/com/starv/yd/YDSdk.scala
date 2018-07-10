@@ -1,6 +1,7 @@
 package com.starv.yd
 
 import java.text.SimpleDateFormat
+import java.util
 import java.util.regex.Pattern
 
 import com.starv.SourceTmp
@@ -27,7 +28,7 @@ object YDSdk {
       System.err.println("Usage: dt platform  ")
       System.exit(1)
     }
-    val Array(dt, platform) = args
+    val Array(dt, platform,state) = args
     MGTVConst.validatePlatform(platform)
 
     val spark = SparkSession.builder()
@@ -42,7 +43,7 @@ object YDSdk {
     val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + s"/*.log,/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*.log").toDS()
 
 
-    process(source, spark, dt, platform)
+    process(source, spark, dt, platform,state)
   }
 
   /**
@@ -51,7 +52,7 @@ object YDSdk {
     * @param spark sparkSession
     * @param dt    哪一天
     */
-  def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String): Unit = {
+  def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String,state: String): Unit = {
     val channelMap = BroadcastUtils.getChannelMap(spark)
     val channelNameMap = BroadcastUtils.getChannelName(spark) //获取频道名称
     val mediaNameMap = BroadcastUtils.getMediaName(spark, dt, platform, MGTVConst.SDK) //获取媒资名称
@@ -83,18 +84,19 @@ object YDSdk {
              0x03|0C4933BEAE75|004903FF0003204018170C4933BEAE75|003|2018-05-28T00:17:38+0800||http://111.8.22.193:80/180000001002/00000000000000020000000000182276/main.m3u8?stbId=004903FF0003204018170C4933BEAE75&userToken=8879e94ad660da2bce4966d9c2f4f15419vv&usergroup=g19073110000|00000000000000020000000000182276|甘肃卫视|0|watch|0|||
             */
           case LIVE
-            if data.length >= 15 && (data(11) == LIVE_PLAY || data(11) == LIVE_END) =>
-            val conf_channel_code = channelMap.value.getOrElse(data(7), "")
-            val channelName = channelNameMap.value.getOrElse(data(7), "")
+            if data.length >= 15 && (data(11) == LIVE_PLAY || data(11) == LIVE_END) && util.Arrays.asList(data).contains("watch") && !util.Arrays.asList(data).contains("channellist") =>
+            val index = data.indexOf("watch")
+            val conf_channel_code = channelMap.value.getOrElse(data(index-3), "")
+            val channelName = channelNameMap.value.getOrElse(data(index-3), "")
             val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
-              play = data(11) == LIVE_PLAY,
+              play = data(index+1) == LIVE_PLAY,
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
-              channel_id = data(7),
+              channel_id = data(index-3),
               channel_name = channelName,
               live_flag = live_flag,
               platform = platform,
@@ -152,16 +154,17 @@ object YDSdk {
             0x06|mac|user_id|operator|create_time|sp_code|media_id|channel_id|play|time_start|||
             0x06|0C4933BF6F00|004903FF0003204018170C4933BF6F00|003|2018-05-28T07:31:22+0800||http://111.8.22.193:80/180000002002/00000000000000020000000000181941/main.m3u8?starttime=20180528T071835.00Z&stbId=004903FF0003204018170C4933BF6F00&userToken=c653ab1c1d7226f44efb619556e0c24d19vv&usergroup=g19073100000|00000000000000020000000000181941|play|07:18:35|||            */
           case TIME_SHIFT
-            if data.length >= 13 && (data(8) == TIME_SHIFT_PLAY || data(8) == TIME_SHIFT_END) =>
-            val conf_channel_code = channelMap.value.getOrElse(data(7), "")
+            if data.length >= 13 && (data(8) == TIME_SHIFT_PLAY || data(8) == TIME_SHIFT_END) && util.Arrays.asList(data).contains("play") =>
+            val index = data.indexOf("play")
+            val conf_channel_code = channelMap.value.getOrElse(data(index-1), "")
             SourceTmp(
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
-              play = data(8) == TIME_SHIFT_PLAY,
+              play = data(index) == TIME_SHIFT_PLAY,
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
-              channel_id = data(7),
+              channel_id = data(index-1),
               is_timeshift = "1",
               platform = platform,
               source_type = MGTVConst.SDK
@@ -468,369 +471,384 @@ object YDSdk {
       """.stripMargin)
 
     //开机
-    var df = spark.sql(
-      s"""
-         | select
-         |  user_id,
-         |  create_time,
-         |  regionid,
-         |  apk_version,
-         |  '$dt',
-         |  platform,
-         |  source_type
-         | from
-         |   t
-         |  where state = '$init'
+    if (state == "init"){
+      var df = spark.sql(
+        s"""
+           | select
+           |  user_id,
+           |  create_time,
+           |  regionid,
+           |  apk_version,
+           |  '$dt',
+           |  platform,
+           |  source_type
+           | from
+           |   t
+           |  where state = '$init'
           """.stripMargin)
-    CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
-
+      CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
+    }
+    else
     //直播
-    spark.sql(
-      s"""
-         | insert overwrite table owlx.mid_chnl_day
-         | select
-         |  t.user_id,
-         |  p.regionid,
-         |  t.play_start_time,
-         |  t.play_end_time,
-         |  t.channel_id,
-         |  t.channel_name,
-         |  t.conf_channel_code,
-         |  p.apk_version,
-         |  t.live_flag,
-         |  t.is_timeshift,
-         |  p.dt,
-         |  p.platform,
-         |  p.source_type
-         |  from
-         | t , p
-         | where t.user_id = p.user_id
-         | and t.state in ('$live','$timeShift')
-         |
-          """.stripMargin)
-
-
+    if (state == "live" || state == "timeShift"){
+      spark.sql(
+        s"""
+           | insert overwrite table owlx.mid_chnl_day
+           | select
+           |  t.user_id,
+           |  p.regionid,
+           |  t.play_start_time,
+           |  t.play_end_time,
+           |  t.channel_id,
+           |  t.channel_name,
+           |  t.conf_channel_code,
+           |  p.apk_version,
+           |  t.live_flag,
+           |  t.is_timeshift,
+           |  p.dt,
+           |  p.platform,
+           |  p.source_type
+           |  from
+           | t , p
+           | where t.user_id = p.user_id
+           | and t.state in ('$live','$timeShift')
+           |
+    """.stripMargin)
+    }
+    else
     //点播
-    spark.sql(
-      s"""
-         |
+    if (state == "vod"){
+      spark.sql(
+        s"""
+           |
          | select
-         |   t.user_id as uuid,
-         |   p.regionid ,
-         |   t.play_start_time ,
-         |   t.play_end_time ,
-         |   t.media_id ,
-         |   t.media_name  ,
-         |   t.category_id  ,
-         |   p.apk_version,
-         |   t.channel_id,
-         |   p.dt,
-         |   p.platform,
-         |   p.source_type
-         |  from
-         |  t , p
-         | where t.user_id = p.user_id
-         | and t.state = '$vod'
-         |
+           |   t.user_id as uuid,
+           |   p.regionid ,
+           |   t.play_start_time ,
+           |   t.play_end_time ,
+           |   t.media_id ,
+           |   t.media_name  ,
+           |   t.category_id  ,
+           |   p.apk_version,
+           |   t.channel_id,
+           |   p.dt,
+           |   p.platform,
+           |   p.source_type
+           |  from
+           |  t , p
+           | where t.user_id = p.user_id
+           | and t.state = '$vod'
+           |
       """.stripMargin)
-      .createOrReplaceTempView("vod")
+        .createOrReplaceTempView("vod")
 
-
-    spark.sql(
-      s"""
-         |
+      spark.sql(
+        s"""
+           |
          |select
-         |   a.uuid,
-         |   a.regionid ,
-         |   a.play_start_time ,
-         |   a.play_end_time ,
-         |   a.media_id ,
-         |   a.media_name  ,
-         |   a.category_id  ,
-         |   a.apk_version,
-         |   a.channel_id,
-         |   MD5(concat(a.assetid,b.originalid)) as media_uuid,
-         |   a.media_second_name,
-         |   a.assetid,
-         |   nvl(b.originalid,'') as orgin_id,
-         |   a.dt,
-         |   a.platform,
-         |   a.source_type
-         |from (
-         |select
-         |   v.uuid,
-         |   v.regionid ,
-         |   v.play_start_time ,
-         |   v.play_end_time ,
-         |   v.media_id ,
-         |   v.media_name  ,
-         |   v.category_id  ,
-         |   v.apk_version,
-         |   v.channel_id,
-         |   nvl(m.name,'') as media_second_name,
-         |   nvl(m.assetid,'') as assetid,
-         |   v.dt,
-         |   v.platform,
-         |   v.source_type
-         |   from vod v,
-         |(select contentid,name,assetid from hnyd.db_fonsview_vod where dt='$dt') m
-         |  where v.media_id = m.contentid) a
-         |  left join
-         |  (select assetid,originalid from owlx.db_smedia_vodinfomation  where dt= '$dt') b
-         |  on a.assetid=b.assetid
-         |
+           |   a.uuid,
+           |   a.regionid ,
+           |   a.play_start_time ,
+           |   a.play_end_time ,
+           |   a.media_id ,
+           |   a.media_name  ,
+           |   a.category_id  ,
+           |   a.apk_version,
+           |   a.channel_id,
+           |   MD5(concat(a.assetid,b.originalid)) as media_uuid,
+           |   a.media_second_name,
+           |   a.assetid,
+           |   nvl(b.originalid,'') as orgin_id,
+           |   a.dt,
+           |   a.platform,
+           |   a.source_type
+           |from (
+           |select
+           |   v.uuid,
+           |   v.regionid ,
+           |   v.play_start_time ,
+           |   v.play_end_time ,
+           |   v.media_id ,
+           |   v.media_name  ,
+           |   v.category_id  ,
+           |   v.apk_version,
+           |   v.channel_id,
+           |   nvl(m.name,'') as media_second_name,
+           |   nvl(m.assetid,'') as assetid,
+           |   v.dt,
+           |   v.platform,
+           |   v.source_type
+           |   from vod v,
+           |(select contentid,name,assetid from hnyd.db_fonsview_vod where dt='$dt') m
+           |  where v.media_id = m.contentid) a
+           |  left join
+           |  (select assetid,originalid from owlx.db_smedia_vodinfomation  where dt= '$dt') b
+           |  on a.assetid=b.assetid
+           |
        """.stripMargin).createOrReplaceTempView("addvod")
-    spark.sqlContext.cacheTable("addvod")
+      spark.sqlContext.cacheTable("addvod")
 
-    spark.sql(
-      """
-        |insert overwrite table owlx.mid_vod_day
-        |select * from addvod
-      """.stripMargin)
+      spark.sql(
+        """
+          |insert overwrite table owlx.mid_vod_day
+          |select * from addvod
+        """.stripMargin)
 
-    spark.sql(
-      """
-        | select
-        | uuid,
-        | regionid  ,
-        | play_start_time ,
-        | play_end_time ,
-        | media_id  ,
-        | media_name  ,
-        | category_id  ,
-        | apk_version  ,
-        | media_uuid  ,
-        | channel_id  ,
-        | dt ,
-        | platform  ,
-        | source_type
-        | from addvod
-      """.stripMargin)
-      .as[MidVodDay]
-      .flatMap(midVod => {
-        val resVodList = ListBuffer[ResVodDay]()
+      spark.sql(
+        """
+          | select
+          | uuid,
+          | regionid  ,
+          | play_start_time ,
+          | play_end_time ,
+          | media_id  ,
+          | media_name  ,
+          | category_id  ,
+          | apk_version  ,
+          | media_uuid  ,
+          | channel_id  ,
+          | dt ,
+          | platform  ,
+          | source_type
+          | from addvod
+        """.stripMargin)
+        .as[MidVodDay]
+        .flatMap(midVod => {
+          val resVodList = ListBuffer[ResVodDay]()
 
-        val resVodDay = ResVodDay(
-          uuid = midVod.uuid,
-          regionid = midVod.regionid,
-          play_start_time = midVod.play_start_time,
-          play_end_time = midVod.play_end_time,
-          apk_version = midVod.apk_version,
-          media_uuid = midVod.media_uuid,
-          media_id = midVod.media_id,
-          media_name = midVod.media_name,
-          channel_id = midVod.channel_id,
-          category_id = midVod.category_id,
-          dt = midVod.dt,
-          platform = midVod.platform,
-          source_type = midVod.source_type
-        )
+          val resVodDay = ResVodDay(
+            uuid = midVod.uuid,
+            regionid = midVod.regionid,
+            play_start_time = midVod.play_start_time,
+            play_end_time = midVod.play_end_time,
+            apk_version = midVod.apk_version,
+            media_uuid = midVod.media_uuid,
+            media_id = midVod.media_id,
+            media_name = midVod.media_name,
+            channel_id = midVod.channel_id,
+            category_id = midVod.category_id,
+            dt = midVod.dt,
+            platform = midVod.platform,
+            source_type = midVod.source_type
+          )
 
-        val media_name: String = resVodDay.media_name
-        val media_id: String = resVodDay.media_id
-        val category_id: String = resVodDay.category_id
+          val media_name: String = resVodDay.media_name
+          val media_id: String = resVodDay.media_id
+          val category_id: String = resVodDay.category_id
 
-        // 根据媒资id匹配栏目id和频道id
-        def fillMatchCategoryData() = {
-          for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
-            val resVodTmp = resVodDay.copy()
-            resVodTmp.category_id = categoryId
-            resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
-            resVodList += resVodTmp
-          }
-        }
-
-        //如果没有上报媒资名称 取一下媒资库中的数据
-        if (StringUtils.isEmpty(media_name)) {
-          resVodDay.media_name = mediaNameMap.value.getOrElse(media_id, "")
-        }
-        //没有上报栏目id
-        if (StringUtils.isEmpty(category_id)) {
-          fillMatchCategoryData()
-        } else {
-          //通过上报的栏目id获取真实的栏目id和频道id
-          val option = ydCategoryIdAndChannelIdMap.value.get(category_id)
-          if (option.nonEmpty) {
-            val categoryIdAndChannelId = option.get
-            resVodDay.category_id = categoryIdAndChannelId._1
-            resVodDay.channel_id = categoryIdAndChannelId._2
-          } else {
-            //上报的栏目id 匹配不到结果的话 老套路 根据媒资id匹配去
-            fillMatchCategoryData()
-          }
-          resVodList += resVodDay
-        }
-
-        //审片栏目和 flag业务逻辑计算
-        resVodList.foreach(data => {
-          data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
-          data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
-          val breaks = new Breaks
-          breaks.breakable({
-            for (elem <- testCategoryNameList.value) {
-              if (data.category_name.startsWith(elem)) {
-                data.flag = MGTVConst.VOD_FILTER_FLAG
-                breaks.break()
-              }
+          // 根据媒资id匹配栏目id和频道id
+          def fillMatchCategoryData() = {
+            for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
+              val resVodTmp = resVodDay.copy()
+              resVodTmp.category_id = categoryId
+              resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+              resVodList += resVodTmp
             }
+          }
+
+          //如果没有上报媒资名称 取一下媒资库中的数据
+          if (StringUtils.isEmpty(media_name)) {
+            resVodDay.media_name = mediaNameMap.value.getOrElse(media_id, "")
+          }
+          //没有上报栏目id
+          if (StringUtils.isEmpty(category_id)) {
+            fillMatchCategoryData()
+          } else {
+            //通过上报的栏目id获取真实的栏目id和频道id
+            val option = ydCategoryIdAndChannelIdMap.value.get(category_id)
+            if (option.nonEmpty) {
+              val categoryIdAndChannelId = option.get
+              resVodDay.category_id = categoryIdAndChannelId._1
+              resVodDay.channel_id = categoryIdAndChannelId._2
+            } else {
+              //上报的栏目id 匹配不到结果的话 老套路 根据媒资id匹配去
+              fillMatchCategoryData()
+            }
+            resVodList += resVodDay
+          }
+
+          //审片栏目和 flag业务逻辑计算
+          resVodList.foreach(data => {
+            data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
+            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
+            val breaks = new Breaks
+            breaks.breakable({
+              for (elem <- testCategoryNameList.value) {
+                if (data.category_name.startsWith(elem)) {
+                  data.flag = MGTVConst.VOD_FILTER_FLAG
+                  breaks.break()
+                }
+              }
+            })
           })
+          val maybeVodDay = resVodList.find(_.flag != MGTVConst.VOD_FILTER_FLAG)
+          if (maybeVodDay.nonEmpty) {
+            maybeVodDay.get.flag = MGTVConst.VOD_PROGRAM_FLAG
+          }
+          resVodList
         })
-        val maybeVodDay = resVodList.find(_.flag != MGTVConst.VOD_FILTER_FLAG)
-        if (maybeVodDay.nonEmpty) {
-          maybeVodDay.get.flag = MGTVConst.VOD_PROGRAM_FLAG
-        }
-        resVodList
-      })
-      .createOrReplaceTempView("res_vod_tmp")
+        .createOrReplaceTempView("res_vod_tmp")
 
-    spark.sql(
-      """
-        | insert overwrite table owlx.res_vod_day
-        | select * from res_vod_tmp
-      """.stripMargin)
-    spark.sqlContext.uncacheTable("addvod")
-
+      spark.sql(
+        """
+          | insert overwrite table owlx.res_vod_day
+          | select * from res_vod_tmp
+        """.stripMargin)
+      spark.sqlContext.uncacheTable("addvod")
+    }
+    else
     //回看
-    spark.sql(
-      s"""
-         | insert overwrite table owlx.mid_tvod_day
-         | select
-         |  t.user_id,
-         |  p.regionid,
-         |  t.play_start_time,
-         |  t.play_end_time,
-         |  t.media_id,
-         |  t.media_name,
-         |  t.conf_channel_code,
-         |  t.channel_id,
-         |  t.channel_name,
-         |  p.apk_version,
-         |  p.dt,
-         |  p.platform,
-         |  p.source_type
-         |  from
-         |  t , p
-         | where t.user_id = p.user_id
-         | and t.state = '$lookBack'
-         |
+    if (state == "lookback"){
+      spark.sql(
+        s"""
+           | insert overwrite table owlx.mid_tvod_day
+           | select
+           |  t.user_id,
+           |  p.regionid,
+           |  t.play_start_time,
+           |  t.play_end_time,
+           |  t.media_id,
+           |  t.media_name,
+           |  t.conf_channel_code,
+           |  t.channel_id,
+           |  t.channel_name,
+           |  p.apk_version,
+           |  p.dt,
+           |  p.platform,
+           |  p.source_type
+           |  from
+           |  t , p
+           | where t.user_id = p.user_id
+           | and t.state = '$lookBack'
+           |
       """.stripMargin)
+    }
+    else
     //时移
-    spark.sql(
-      s"""
-         | insert overwrite table owlx.mid_timeshift_day
-         | select
-         |   t.user_id,
-         |   p.regionid,
-         |   t.play_start_time,
-         |   t.play_end_time,
-         |   t.channel_id,
-         |   p.apk_version,
-         |   p.dt,
-         |   p.platform,
-         |   p.source_type
-         |  from
-         |  t , p
-         | where t.user_id = p.user_id
-         | and t.state = '$timeShift'
-         |
+    if (state == "timeshift"){
+      spark.sql(
+        s"""
+           | insert overwrite table owlx.mid_timeshift_day
+           | select
+           |   t.user_id,
+           |   p.regionid,
+           |   t.play_start_time,
+           |   t.play_end_time,
+           |   t.channel_id,
+           |   p.apk_version,
+           |   p.dt,
+           |   p.platform,
+           |   p.source_type
+           |  from
+           |  t , p
+           | where t.user_id = p.user_id
+           | and t.state = '$timeShift'
+           |
       """.stripMargin)
+    }
+    else
     //页面访问
-    spark.sql(
-      s"""
-         | insert overwrite table owlx.mid_pageview_day
-         | select
-         |   t.user_id,
-         |   p.regionid,
-         |   t.sp_code,
-         |   t.pagepath,
-         |   t.nextpagepath ,
-         |   t.pagename ,
-         |   t.event_type ,
-         |   t.special_id ,
-         |   t.page_id ,
-         |   t.way ,
-         |   t.offset_name,
-         |   t.offset_id,
-         |   t.key,
-         |   t.keyname,
-         |   t.media_id,
-         |   t.media_name,
-         |   t.category_id,
-         |   t.channel_id,
-         |   p.apk_version,
-         |   t.offset_group,
-         |   t.media_group,
-         |   t.create_time,
-         |   p.dt,
-         |   p.platform,
-         |   p.source_type
-         |  from
-         |  t , p
-         | where t.user_id = p.user_id
-         | and t.state = '$pageView'
-         |
+    if (state == "pageview"){
+      spark.sql(
+        s"""
+           | insert overwrite table owlx.mid_pageview_day
+           | select
+           |   t.user_id,
+           |   p.regionid,
+           |   t.sp_code,
+           |   t.pagepath,
+           |   t.nextpagepath ,
+           |   t.pagename ,
+           |   t.event_type ,
+           |   t.special_id ,
+           |   t.page_id ,
+           |   t.way ,
+           |   t.offset_name,
+           |   t.offset_id,
+           |   t.key,
+           |   t.keyname,
+           |   t.media_id,
+           |   t.media_name,
+           |   t.category_id,
+           |   t.channel_id,
+           |   p.apk_version,
+           |   t.offset_group,
+           |   t.media_group,
+           |   t.create_time,
+           |   p.dt,
+           |   p.platform,
+           |   p.source_type
+           |  from
+           |  t , p
+           | where t.user_id = p.user_id
+           | and t.state = '$pageView'
+           |
       """.stripMargin)
-
-    //正则获取大版本apkVersion
-    spark.udf.register("parent_apk", func = (apkVersion: String) => {
-      val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
-      val matcher = pattern.matcher(apkVersion)
-      if (matcher.find())
-        matcher.group(1)
-      else
-        ""
-    })
-
-
+    }
+    else
     //订购
-    spark.sql(
-      s"""
-         |insert overwrite table owlx.mid_order_day
-         |select
-         |  t.user_id,
-         |  t.boss_id,
-         |   '',
-         |  t.status,
-         |  p.apk_version,
-         |  parent_apk(p.apk_version),
-         |  t.create_time,
-         |  t.product_name,
-         |  t.product_price,
-         |  t.media_id,
-         |  t.media_name,
-         |  t.category_id,
-         |  t.channel_id,
-         |  t.pagepath,
-         |  t.nextpagepath,
-         |  p.dt,
-         |  p.platform,
-         |  t.source_type
-         |from
-         |t , p
-         |where t.user_id=p.user_id
-         |and t.state='$order'
+    if (state == "order"){
+      //正则获取大版本apkVersion
+      spark.udf.register("parent_apk", func = (apkVersion: String) => {
+        val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
+        val matcher = pattern.matcher(apkVersion)
+        if (matcher.find())
+          matcher.group(1)
+        else
+          ""
+      })
+      spark.sql(
+        s"""
+           |insert overwrite table owlx.mid_order_day
+           |select
+           |  t.user_id,
+           |  t.boss_id,
+           |   '',
+           |  t.status,
+           |  p.apk_version,
+           |  parent_apk(p.apk_version),
+           |  t.create_time,
+           |  t.product_name,
+           |  t.product_price,
+           |  t.media_id,
+           |  t.media_name,
+           |  t.category_id,
+           |  t.channel_id,
+           |  t.pagepath,
+           |  t.nextpagepath,
+           |  p.dt,
+           |  p.platform,
+           |  t.source_type
+           |from
+           |t , p
+           |where t.user_id=p.user_id
+           |and t.state='$order'
       """.stripMargin)
-
-
-
+    }
+    else
     //错误
-    spark.sql(
-      s"""
-         |  insert overwrite table owlx.mid_error_day
-         |  select
-         |   p.apk_version,
-         |   t.user_id,
-         |   t.error_code,
-         |   t.error_detail,
-         |   t.create_time,
-         |   p.dt,
-         |   p.platform,
-         |   p.source_type
-         |  from
-         |  t , p
-         |  where t.user_id = p.user_id
-         |  and t.state='$error'
+    if (state == "error"){
+      spark.sql(
+        s"""
+           |  insert overwrite table owlx.mid_error_day
+           |  select
+           |   p.apk_version,
+           |   t.user_id,
+           |   t.error_code,
+           |   t.error_detail,
+           |   t.create_time,
+           |   p.dt,
+           |   p.platform,
+           |   p.source_type
+           |  from
+           |  t , p
+           |  where t.user_id = p.user_id
+           |  and t.state='$error'
       """.stripMargin)
+    }
+    else{
+      System.out.println("END")
+    }
 
     spark.sqlContext.uncacheTable("t")
     spark.sqlContext.uncacheTable("p")
