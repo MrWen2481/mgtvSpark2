@@ -87,8 +87,9 @@ object YDSdk {
              0x03|mac|user_id|operator|create_time|sp_code|play_url|channel_id|channel_name|chan nel_status|watch|status|||
              0x03|0C4933BEAE75|004903FF0003204018170C4933BEAE75|003|2018-05-28T00:17:38+0800||http://111.8.22.193:80/180000001002/00000000000000020000000000182276/main.m3u8?stbId=004903FF0003204018170C4933BEAE75&userToken=8879e94ad660da2bce4966d9c2f4f15419vv&usergroup=g19073110000|00000000000000020000000000182276|甘肃卫视|0|watch|0|||
             */
+          //util.Arrays.asList(data).contains("watch") && !util.Arrays.asList(data).contains("channellist")   data(data.length-5).equals("watch")
           case LIVE
-            if data.length >= 15 && (data(11) == LIVE_PLAY || data(11) == LIVE_END) && util.Arrays.asList(data).contains("watch") && !util.Arrays.asList(data).contains("channellist") =>
+            if data.length >= 15 && (data(data.length-4) == LIVE_PLAY || data(data.length-4) == LIVE_END) && data(data.length-5).equals("watch") =>
             val index = data.indexOf("watch")
             val conf_channel_code = channelMap.value.getOrElse(data(index-3), "")
             val channelName = channelNameMap.value.getOrElse(data(index-3), "")
@@ -158,7 +159,7 @@ object YDSdk {
             0x06|mac|user_id|operator|create_time|sp_code|media_id|channel_id|play|time_start|||
             0x06|0C4933BF6F00|004903FF0003204018170C4933BF6F00|003|2018-05-28T07:31:22+0800||http://111.8.22.193:80/180000002002/00000000000000020000000000181941/main.m3u8?starttime=20180528T071835.00Z&stbId=004903FF0003204018170C4933BF6F00&userToken=c653ab1c1d7226f44efb619556e0c24d19vv&usergroup=g19073100000|00000000000000020000000000181941|play|07:18:35|||            */
           case TIME_SHIFT
-            if data.length >= 13 && (data(8) == TIME_SHIFT_PLAY || data(8) == TIME_SHIFT_END) && util.Arrays.asList(data).contains("play") =>
+            if data.length >= 13 && (data(data.length-5) == TIME_SHIFT_PLAY || data(data.length-5) == TIME_SHIFT_END) && (data(data.length-5).equals("play") || data(data.length-5).equals("exit")) =>
             val index = data.indexOf("play")
             val conf_channel_code = channelMap.value.getOrElse(data(index-1), "")
             SourceTmp(
