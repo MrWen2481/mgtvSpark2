@@ -89,7 +89,7 @@ object YDSdk {
             */
           //util.Arrays.asList(data).contains("watch") && !util.Arrays.asList(data).contains("channellist")   data(data.length-5).equals("watch")
           case LIVE
-            if data.length >= 15 && (data(data.length-4) == LIVE_PLAY || data(data.length-4) == LIVE_END) && data(data.length-5).equals("watch") =>
+            if data.length >= 15 && (data(data.length-4) == LIVE_PLAY || data(data.length-4) == LIVE_END) && x.contains("watch") =>
             val index = data.indexOf("watch")
             val conf_channel_code = channelMap.value.getOrElse(data(index-3), "")
             val channelName = channelNameMap.value.getOrElse(data(index-3), "")
@@ -159,8 +159,14 @@ object YDSdk {
             0x06|mac|user_id|operator|create_time|sp_code|media_id|channel_id|play|time_start|||
             0x06|0C4933BF6F00|004903FF0003204018170C4933BF6F00|003|2018-05-28T07:31:22+0800||http://111.8.22.193:80/180000002002/00000000000000020000000000181941/main.m3u8?starttime=20180528T071835.00Z&stbId=004903FF0003204018170C4933BF6F00&userToken=c653ab1c1d7226f44efb619556e0c24d19vv&usergroup=g19073100000|00000000000000020000000000181941|play|07:18:35|||            */
           case TIME_SHIFT
-            if data.length >= 13 && (data(data.length-5) == TIME_SHIFT_PLAY || data(data.length-5) == TIME_SHIFT_END) && (data(data.length-5).equals("play") || data(data.length-5).equals("exit")) =>
-            val index = data.indexOf("play")
+            if data.length >= 13 && (data(data.length-5) == TIME_SHIFT_PLAY || data(data.length-5) == TIME_SHIFT_END) =>
+            var index = -1
+            if (data(data.length-5) == TIME_SHIFT_PLAY ){
+              index = data.indexOf("play")
+            }else{
+              index = data.indexOf("exit")
+            }
+
             val conf_channel_code = channelMap.value.getOrElse(data(index-1), "")
             SourceTmp(
               state = data(0),
