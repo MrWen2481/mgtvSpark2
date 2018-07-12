@@ -334,7 +334,7 @@ object YDSdk {
           tmp = null
         })
         //页面浏览 和 错误
-        resultList ++= dataList.filter(x => x.state == PAGE_VIEW || x.state == ERROR || x.state == ORDER)
+        resultList ++= dataList.filter(x => x.state == PAGE_VIEW || x.state == ERROR || x.state == ORDER || x.state == HEART)
           .filter(_.create_time.startsWith(dt))
 
         //开机 每个用户只入最后一条
@@ -369,6 +369,7 @@ object YDSdk {
     val pageView = PAGE_VIEW
     val order = ORDER
     val error = ERROR
+    val heart = HEART
     val source_type = MGTVConst.SDK
 
     //活跃 o
