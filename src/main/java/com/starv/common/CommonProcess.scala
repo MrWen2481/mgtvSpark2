@@ -222,7 +222,7 @@ object CommonProcess {
     } else if (state == YDConst.LOOK_BACK) {
       Int.MaxValue
     } else { //LIVE OR TIME_SHIFT
-      86400
+      28800
     }
   }
 

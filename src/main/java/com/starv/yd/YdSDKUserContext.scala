@@ -36,37 +36,21 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
       if (!heartCreateTimeSet.isEmpty) {
         val createTime = heartCreateTimeSet.last()
         if (createTime > tmp.play_start_time) {
-          //判断最后一条心跳时间与开始时间差是否大于24小时 是 取开始时间加5分钟 否 取最后一条心跳时间
-          if (TimeUtils.getDateTimeDuration(tmp.play_start_time, createTime) >
-            CommonProcess.getMaxViewTimeFilterTimeByState(tmp.state)) {
-            return TimeUtils.plusMinute(tmp.play_start_time, 5)
-          } else {
-            endTime = createTime
-            findEndTime = true
-          }
+          endTime = createTime
+          findEndTime = true
         }
       }
       //心跳为空
       if (!findEndTime) {
-        //心跳周期是5分钟
-        //没有心跳有开机，判断开机时间与开始时间是否在一个心跳时间内,在就取开机时间为结束时间，否取开始时间加5分钟
-        val initTime = initTimeSet.higher(tmp.play_start_time)
-        if (initTime != null && initTime > tmp.play_start_time) {
-          if (TimeUtils.getDateTimeDuration(tmp.play_start_time, initTime) > 300) {
-            return TimeUtils.plusMinute(tmp.play_start_time, 5)
-          }
-          else {
-            endTime = initTime
-          }
-        }
-        else {
-          return TimeUtils.plusMinute(tmp.play_start_time, 5)
-        }
+        return TimeUtils.plusMinute(tmp.play_start_time, 5)
       }
-
+    }
+    if (TimeUtils.getDuration(tmp.play_start_time, endTime) > CommonProcess.getMaxViewTimeFilterTimeByState(tmp.state)) {
+      return TimeUtils.plusMinute(tmp.play_start_time, 5)
     }
     //这里还要判断一下是否重新开过机
     val initTime = initTimeSet.lower(endTime)
+    val lastHeartTime = heartCreateTimeSet.lower(endTime)
     //开机时间要大于关机前的播放时间
     if (initTime != null && initTime > tmp.play_start_time) {
       //取开机前的上一次心跳时间
@@ -77,25 +61,22 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
         return TimeUtils.plusMinute(tmp.play_start_time, 5)
       }
     }
-    //没有开机的情况下 或上次开机小于播放开始时间
-    else if (initTime == null || initTime < tmp.play_start_time) {
-      //取下一条业务前的最后一条心跳时间
-      val lastHeartTime = heartCreateTimeSet.lower(endTime)
-      //开始时间后，下个业务时间前，没有最后一条心跳时间，判断开始时间与下个业务时间的差是否在4个心跳时间内
-      //心跳不为空 大于4个心跳 取最后一个心跳时间
-      if (lastHeartTime != null && TimeUtils.getDateTimeDuration(lastHeartTime, endTime) > 20 * 60) {
+    //开始时间后，下个业务时间前，没有最后一条心跳时间，判断开始时间与下个业务时间的差是否在4个心跳时间内
+    //心跳不为空
+    if (lastHeartTime != null && lastHeartTime > tmp.play_start_time) {
+      val duration = TimeUtils.getDuration(lastHeartTime, endTime)
+      if (duration <= 20 * 60) {
+        return endTime
+      } else {
         return lastHeartTime
       }
-      //心跳不为空 小于等于4个心跳 取下一个业务时间
-      else if (lastHeartTime != null && TimeUtils.getDateTimeDuration(lastHeartTime, endTime) <= 20 * 60) {
+    }
+    //心跳为空
+    if (lastHeartTime == null) {
+      val duration = TimeUtils.getDuration(tmp.play_start_time, endTime)
+      if (duration <= 20 * 60) {
         return endTime
-      }
-      //(中间没有心跳 或者 小于等于4个心跳) 并且 下一个业务开始时间 - 开始时间 <= 20分钟 取下个业务时间为结束时间
-      else if (lastHeartTime == null && TimeUtils.getDateTimeDuration(tmp.play_start_time, endTime) <= 20 * 60) {
-        return endTime
-      }
-      //中间没有心跳 但是最后的业务大于开始时间4个心跳周期
-      else if (lastHeartTime == null  && TimeUtils.getDateTimeDuration(tmp.play_start_time, endTime) > 20 * 60) {
+      } else {
         return TimeUtils.plusMinute(tmp.play_start_time, 5)
       }
     }

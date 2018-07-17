@@ -7,20 +7,21 @@ import org.apache.commons.lang3.time.{DateFormatUtils, DateUtils}
 
 /**
   * @author zyx 
-  *  2018/3/26.
+  *         2018/3/26.
   */
 object TimeUtils {
 
   val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd")
   val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HHmmss")
   val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
+
   /**
     *
     * @param time HH:mm:ss 格式的时间字符串
     * @return 秒
     */
-  def timeStrToSecond(time:String): Long = {
-    val data = time.split(":",-1)
+  def timeStrToSecond(time: String): Long = {
+    val data = time.split(":", -1)
     data(0).toLong * 3600 + data(1).toLong * 60 + data(2).toLong
   }
 
@@ -29,7 +30,7 @@ object TimeUtils {
     *
     * @param day 日期
     */
-  def plusDay(day:String,daysToAdd:Int): String ={
+  def plusDay(day: String, daysToAdd: Int): String = {
     LocalDate.parse(day, dayFormatter)
       .plusDays(daysToAdd)
       .format(dayFormatter)
@@ -37,8 +38,9 @@ object TimeUtils {
 
   /**
     * 000000 000030
+    *
     * @param startTime HHmmss
-    * @param endTime HHmmss
+    * @param endTime   HHmmss
     * @return 30
     */
   def getTimeDuration(startTime: String, endTime: String): Int = {
@@ -52,12 +54,13 @@ object TimeUtils {
     * @param endTime   yyyyMMddHHmmss
     * @return 30
     */
-  def getDateTimeDuration(startTime: String, endTime: String): Int = {
-    LocalTime.parse(endTime, dateTimeFormatter).toSecondOfDay - LocalTime.parse(startTime, dateTimeFormatter).toSecondOfDay
+  def getDuration(startTime: String, endTime: String): Long = {
+    (DateUtils.parseDate(endTime, "yyyyMMddHHmmss").getTime - DateUtils.parseDate(startTime, "yyyyMMddHHmmss")
+      .getTime) / 1000
   }
 
   def main(args: Array[String]): Unit = {
-    println(plusSecond("20180101000000",30))
+    println(getDuration("20180101235959", "20180102000030"))
   }
 
   def plusSecond(time: String, secondsToAdd: Int): String = {

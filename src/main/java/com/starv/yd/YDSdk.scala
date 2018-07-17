@@ -39,7 +39,7 @@ object YDSdk {
       .getOrCreate()
     import spark.implicits._
 
-    val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + s"/*.log,/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*.log").toDS()
+    val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + s"/*,/warehouse/HNYD/sdk_0x*/dt=$dt/*,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*").toDS()
     //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + "/*.log").toDS()
 
 
@@ -655,10 +655,10 @@ object YDSdk {
           // 根据媒资id匹配栏目id和频道id
           def fillMatchCategoryData() = {
             for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
-              //val resVodTmp = resVodDay.copy()
-              resVodDay.category_id = categoryId
-              resVodDay.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
-              resVodList += resVodDay
+              val resVodTmp = resVodDay.copy()
+              resVodTmp.category_id = categoryId
+              resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+              resVodList += resVodTmp
             }
           }
 
