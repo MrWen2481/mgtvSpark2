@@ -10,6 +10,15 @@ import org.apache.spark.sql.SparkSession
   * --driver-memory 3G \
   * --conf spark.default.parallelism=500
   *
+  * spark2-submit \
+  * --master yarn \
+  * --executor-memory 12g \
+  * --executor-cores 4 \
+  * --num-executors 10  \
+  * --driver-memory 3G \
+  * --conf spark.default.parallelism=500 \
+  * Starv-Spark2.jar com.starv.Ocn
+  *
   * @author zyx 
   * @date 2018/6/22.
   */

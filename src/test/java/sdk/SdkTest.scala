@@ -30,6 +30,11 @@ object SdkTest {
       .getOrCreate()
     import spark.implicits._
 
+    spark.read.textFile("/warehouse/HNYD/sdk_0x*/dt=20180603/*.log")
+        .filter{x=>val data = x.split("\\|",-1);data(2) == "004903FF001844100007A8BD3A2A2CE9"}
+      .collect()
+      .foreach(println(_))
+
 //    val source = spark.sparkContext.textFile("C:\\StarvCode\\mgtvSpark2\\src\\test\\java\\testCace\\跨天测试.txt")
 //    val source = spark.sparkContext.textFile("C:\\StarvCode\\mgtvSpark2\\src\\test\\java\\testCace\\3到24小时过滤.txt")
 //    val source = spark.sparkContext.textFile("C:\\StarvCode\\mgtvSpark2\\src\\test\\java\\testCace\\有心跳没结束.txt")
@@ -229,7 +234,7 @@ object SdkTest {
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
-              product_id = data(9),
+              boss_id = data(9),
               product_name = data(8),
               product_price = data(10),
               media_id = data(12),

@@ -9,12 +9,10 @@ object APITest {
   case class Zyx(c1: String, c2: Int)
 
   def main(args: Array[String]): Unit = {
-    val maybeString = Option.empty
-    if (maybeString.nonEmpty) {
-      println(maybeString.get)
+    for (elem <- (Set("1", "2", "3") -- Set("1"))) {
+      println(elem)
     }
 
-    println(List(("1",1), ("1", 1), ("2", 1), ("12", 1)).toMap)
   }
 
 }
