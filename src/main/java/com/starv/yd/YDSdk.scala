@@ -203,7 +203,7 @@ object YDSdk {
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               sp_code = data(5),
-              play = true,
+              play = false,
               page_id = data(7),
               pagepath = data(8),
               nextpagepath = data(9),
@@ -312,7 +312,7 @@ object YDSdk {
         val userContext = new YdSDKUserContext(dataList)
         //根据上下文补充开始结束时间
         dataList.filter(needComputedDuration).groupBy(_.state).foreach(tuple => {
-          tuple._2.sortBy(_.create_time).foreach(data => {
+          tuple._2.sortBy(x=>(x.create_time,x.play)).foreach(data => {
             if (data.play) {
               if (tmp != null) {
                 tmp.play_end_time = userContext.getNextEndTime(tmp)
