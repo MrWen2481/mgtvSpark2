@@ -17,6 +17,7 @@ object YDConst {
   val ERROR = "0x11"
   val LIVE_PLAY = "0"
   val LIVE_END = "1"
+  val DIRTY = "laji"
 
   val VOD_PLAY = "play"
   val VOD_END = "exit"

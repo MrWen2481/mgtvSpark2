@@ -71,15 +71,6 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
         return lastHeartTime
       }
     }
-    //心跳为空
-    if (lastHeartTime == null) {
-      val duration = TimeUtils.getDuration(tmp.play_start_time, endTime)
-      if (duration <= 20 * 60) {
-        return endTime
-      } else {
-        return TimeUtils.plusMinute(tmp.play_start_time, 5)
-      }
-    }
     endTime
   }
 
