@@ -28,7 +28,7 @@ object YDSdk {
       System.err.println("Usage: dt platform  state")
       System.exit(1)
     }
-    val Array(dt, platform,state) = args
+    val Array(dt, platform, state) = args
     MGTVConst.validatePlatform(platform)
 
     val spark = SparkSession.builder()
@@ -43,7 +43,7 @@ object YDSdk {
     //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + "/*.log").toDS()
 
 
-    process(source, spark, dt, platform,state)
+    process(source, spark, dt, platform, state)
   }
 
   /**
@@ -52,7 +52,7 @@ object YDSdk {
     * @param spark sparkSession
     * @param dt    哪一天
     */
-  def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String,state: String): Unit = {
+  def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String, state: String): Unit = {
     val channelMap = BroadcastUtils.getChannelMap(spark)
     val channelNameMap = BroadcastUtils.getChannelName(spark)
     //获取频道名称
@@ -72,10 +72,10 @@ object YDSdk {
     import spark.implicits._
     files.flatMap(_.split("\\\\x0A")).filter(x => {
       //过滤时间格式错乱的数据
-      val keys = x.split("\\|",-1)
-      if (keys(0).equals(INIT)){
+      val keys = x.split("\\|", -1)
+      if (keys(0).equals(INIT)) {
         Try(TimeUtils.fastParseSdkDate(keys(12))).isSuccess
-      }else{
+      } else {
         Try(TimeUtils.fastParseSdkDate(keys(4))).isSuccess
       }
     })
@@ -89,19 +89,19 @@ object YDSdk {
             */
           //util.Arrays.asList(data).contains("watch") && !util.Arrays.asList(data).contains("channellist")   data(data.length-5).equals("watch")
           case LIVE
-            if data.length >= 15 && (data(data.length-4) == LIVE_PLAY || data(data.length-4) == LIVE_END) && x.contains("watch") =>
+            if data.length >= 15 && (data(data.length - 4) == LIVE_PLAY || data(data.length - 4) == LIVE_END) && x.contains("watch") =>
             val index = data.indexOf("watch")
-            val conf_channel_code = channelMap.value.getOrElse(data(index-3), "")
-            val channelName = channelNameMap.value.getOrElse(data(index-3), "")
+            val conf_channel_code = channelMap.value.getOrElse(data(index - 3), "")
+            val channelName = channelNameMap.value.getOrElse(data(index - 3), "")
             val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
               state = data(0),
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
-              play = data(index+1) == LIVE_PLAY,
+              play = data(index + 1) == LIVE_PLAY,
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
-              channel_id = data(index-3),
+              channel_id = data(index - 3),
               channel_name = channelName,
               live_flag = live_flag,
               platform = platform,
@@ -159,15 +159,15 @@ object YDSdk {
             0x06|mac|user_id|operator|create_time|sp_code|media_id|channel_id|play|time_start|||
             0x06|0C4933BF6F00|004903FF0003204018170C4933BF6F00|003|2018-05-28T07:31:22+0800||http://111.8.22.193:80/180000002002/00000000000000020000000000181941/main.m3u8?starttime=20180528T071835.00Z&stbId=004903FF0003204018170C4933BF6F00&userToken=c653ab1c1d7226f44efb619556e0c24d19vv&usergroup=g19073100000|00000000000000020000000000181941|play|07:18:35|||            */
           case TIME_SHIFT
-            if data.length >= 13 && (data(data.length-5) == TIME_SHIFT_PLAY || data(data.length-5) == TIME_SHIFT_END) =>
+            if data.length >= 13 && (data(data.length - 5) == TIME_SHIFT_PLAY || data(data.length - 5) == TIME_SHIFT_END) =>
             var index = -1
-            if (data(data.length-5) == TIME_SHIFT_PLAY ){
+            if (data(data.length - 5) == TIME_SHIFT_PLAY) {
               index = data.indexOf("play")
-            }else{
+            } else {
               index = data.indexOf("exit")
             }
 
-            val conf_channel_code = channelMap.value.getOrElse(data(index-1), "")
+            val conf_channel_code = channelMap.value.getOrElse(data(index - 1), "")
             SourceTmp(
               state = data(0),
               user_id = data(2),
@@ -175,7 +175,7 @@ object YDSdk {
               play = data(index) == TIME_SHIFT_PLAY,
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
-              channel_id = data(index-1),
+              channel_id = data(index - 1),
               is_timeshift = "1",
               platform = platform,
               source_type = MGTVConst.SDK
@@ -310,9 +310,13 @@ object YDSdk {
         val dataList = dataArray.toList
         var tmp: SourceTmp = null
         val userContext = new YdSDKUserContext(dataList)
+
+        def sortFunction(x: SourceTmp): (String, Int) = {
+          (x.create_time, if (x.play) 0 else 1)
+        }
         //根据上下文补充开始结束时间
         dataList.filter(needComputedDuration).groupBy(_.state).foreach(tuple => {
-          tuple._2.sortBy(x=>(x.create_time,x.play)).foreach(data => {
+          tuple._2.sortBy(sortFunction).foreach(data => {
             if (data.play) {
               if (tmp != null) {
                 tmp.play_end_time = userContext.getNextEndTime(tmp)
@@ -483,7 +487,7 @@ object YDSdk {
       """.stripMargin)
 
     //开机
-    if (state == "init"){
+    if (state == "init") {
       var df = spark.sql(
         s"""
            | select
@@ -501,8 +505,7 @@ object YDSdk {
       CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
     }
     else
-    //直播
-    if (state == "live" || state == "timeShift"){
+    //直播 if (state == "live" || state == "timeShift") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_chnl_day
@@ -528,8 +531,7 @@ object YDSdk {
     """.stripMargin)
     }
     else
-    //点播
-    if (state == "vod"){
+    //点播 if (state == "vod") {
       spark.sql(
         s"""
            |
@@ -709,8 +711,7 @@ object YDSdk {
       spark.sqlContext.uncacheTable("addvod")
     }
     else
-    //回看
-    if (state == "lookback"){
+    //回看 if (state == "lookback") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_tvod_day
@@ -736,8 +737,7 @@ object YDSdk {
       """.stripMargin)
     }
     else
-    //时移
-    if (state == "timeshift"){
+    //时移 if (state == "timeshift") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_timeshift_day
@@ -759,8 +759,7 @@ object YDSdk {
       """.stripMargin)
     }
     else
-    //页面访问
-    if (state == "pageview"){
+    //页面访问 if (state == "pageview") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_pageview_day
@@ -798,8 +797,7 @@ object YDSdk {
       """.stripMargin)
     }
     else
-    //订购
-    if (state == "order"){
+    //订购 if (state == "order") {
       //正则获取大版本apkVersion
       spark.udf.register("parent_apk", func = (apkVersion: String) => {
         val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
@@ -838,8 +836,7 @@ object YDSdk {
       """.stripMargin)
     }
     else
-    //错误
-    if (state == "error"){
+    //错误 if (state == "error") {
       spark.sql(
         s"""
            |  insert overwrite table owlx.mid_error_day
@@ -858,7 +855,7 @@ object YDSdk {
            |  and t.state='$error'
       """.stripMargin)
     }
-    else{
+    else {
       System.out.println("END")
     }
 
