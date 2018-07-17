@@ -90,14 +90,12 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
       else if (lastHeartTime != null && TimeUtils.getDateTimeDuration(lastHeartTime, endTime) <= 20 * 60) {
         return endTime
       }
-      //中间没有心跳 或者 小于等于4个心跳，取下个业务时间为结束时间
-      else if ((lastHeartTime == null || lastHeartTime < tmp.play_start_time) && TimeUtils.getDateTimeDuration(tmp.play_start_time,
-        endTime) <= 20 * 60) {
+      //(中间没有心跳 或者 小于等于4个心跳) 并且 下一个业务开始时间 - 开始时间 <= 20分钟 取下个业务时间为结束时间
+      else if (lastHeartTime == null && TimeUtils.getDateTimeDuration(tmp.play_start_time, endTime) <= 20 * 60) {
         return endTime
       }
       //中间没有心跳 但是最后的业务大于开始时间4个心跳周期
-      else if ((lastHeartTime == null || lastHeartTime < tmp.play_start_time) && TimeUtils.getDateTimeDuration(tmp.play_start_time,
-        endTime) > 20 * 60) {
+      else if (lastHeartTime == null  && TimeUtils.getDateTimeDuration(tmp.play_start_time, endTime) > 20 * 60) {
         return TimeUtils.plusMinute(tmp.play_start_time, 5)
       }
     }
