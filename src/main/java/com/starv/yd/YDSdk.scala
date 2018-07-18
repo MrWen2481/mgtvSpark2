@@ -489,7 +489,7 @@ object YDSdk {
       """.stripMargin)
 
     //开机
-    if (state == "init") {
+    if (state == "init" || state == "all") {
       var df = spark.sql(
         s"""
            | select
@@ -507,7 +507,7 @@ object YDSdk {
       CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
     }
     //直播
-    else if (state == "live" || state == "timeShift") {
+     if (state == "live" || state == "timeShift" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_chnl_day
@@ -533,7 +533,7 @@ object YDSdk {
     """.stripMargin)
     }
     //点播
-    else if (state == "vod") {
+     if (state == "vod" || state == "all") {
       spark.sql(
         s"""
            |
@@ -714,7 +714,7 @@ object YDSdk {
       spark.sqlContext.uncacheTable("addvod")
     }
     //回看
-    else if (state == "lookback") {
+     if (state == "lookback" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_tvod_day
@@ -740,7 +740,7 @@ object YDSdk {
       """.stripMargin)
     }
     //时移
-    else if (state == "timeshift") {
+     if (state == "timeshift" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_timeshift_day
@@ -762,7 +762,7 @@ object YDSdk {
       """.stripMargin)
     }
     //页面访问
-    else if (state == "pageview") {
+     if (state == "pageview" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_pageview_day
@@ -800,7 +800,7 @@ object YDSdk {
       """.stripMargin)
     }
     //订购
-    else if (state == "order") {
+     if (state == "order" || state == "all") {
       //正则获取大版本apkVersion
       val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
       spark.udf.register("parent_apk", func = (apkVersion: String) => {
@@ -839,8 +839,8 @@ object YDSdk {
       """.stripMargin)
     }
     //错误
-    else
-    if (state == "error") {
+
+    if (state == "error" || state == "all") {
       spark.sql(
         s"""
            |  insert overwrite table owlx.mid_error_day

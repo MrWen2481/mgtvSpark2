@@ -217,11 +217,9 @@ object CommonProcess {
   }
 
   def getMaxViewTimeFilterTimeByState(state: String): Int = {
-    if (state == YDConst.VOD) {
+    if (state == YDConst.VOD || state == YDConst.LOOK_BACK) {
       14400
-    } else if (state == YDConst.LOOK_BACK) {
-      Int.MaxValue
-    } else { //LIVE OR TIME_SHIFT
+    }  else { //LIVE OR TIME_SHIFT
       28800
     }
   }
