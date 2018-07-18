@@ -1,7 +1,6 @@
 package com.starv.yd
 
 import java.text.SimpleDateFormat
-import java.util
 import java.util.regex.Pattern
 
 import com.starv.SourceTmp
@@ -169,6 +168,7 @@ object YDSdk {
             }
 
             val conf_channel_code = channelMap.value.getOrElse(data(index - 1), "")
+            val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
               state = data(0),
               user_id = data(2),
@@ -177,6 +177,7 @@ object YDSdk {
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
               channel_id = data(index - 1),
+              live_flag = live_flag,
               is_timeshift = "1",
               platform = platform,
               source_type = MGTVConst.SDK
