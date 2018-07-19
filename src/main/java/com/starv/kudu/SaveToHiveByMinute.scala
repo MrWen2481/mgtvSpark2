@@ -1,4 +1,4 @@
-package com.starv.kudu
+package com.starv.hunan
 
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -10,8 +10,8 @@ import scala.collection.mutable.ListBuffer
 
 
 /**
-  * @author zyx 
-  *  2018/4/25.
+  * @author zyx
+  *         2018/4/25.
   */
 object SaveToHiveByMinute {
 
@@ -30,7 +30,7 @@ object SaveToHiveByMinute {
       System.err.println("Usage: SaveToHiveBySecond yyyyMMdd ")
       System.exit(1)
     }
-    val Array(dt,platform,source_type) = args
+    val Array(dt, platform, source_type) = args
 
     val spark = SparkSession.
       builder()
@@ -42,7 +42,6 @@ object SaveToHiveByMinute {
 
     import spark.implicits._
     import spark.sql
-
 
     val kudu = new KuduContext("m01:7051,m02:7051", spark.sparkContext)
 
@@ -57,7 +56,7 @@ object SaveToHiveByMinute {
          | source_type
          |from owlx.mid_chnl_day
          | where dt='$dt' and platform='$platform' and source_type='$source_type'
-         | and conf_channel_id is not null
+         | and flag= '0'
       """.stripMargin)
       .map(rows => (rows.getString(0) + "|" + rows.getString(3) + "|" + rows.getString(4) + "|" + rows.getString(5),
         rows.getString(1) + "|" + rows.getString(2)))
@@ -76,7 +75,7 @@ object SaveToHiveByMinute {
           timeMap += (timeStr -> i)
         }
 
-       // val timeMapBD = spark.sparkContext.broadcast(timeMap).value
+        // val timeMapBD = spark.sparkContext.broadcast(timeMap).value
 
 
         dataList.foreach(line => {
@@ -84,12 +83,12 @@ object SaveToHiveByMinute {
           var startIndex = timeMap(startTime.takeRight(6).take(4) + "00")
           val endIndex = timeMap(endTime.takeRight(6).take(4) + "00")
           //开始结束是在同一分钟内的
-          if (startTime.takeRight(2) == endTime.takeRight(2)) {
-            val startSecond = endTime.takeRight(2).toInt - startTime.takeRight(2).toInt
+          if (startTime.substring(10, 12) == endTime.substring(10, 12)) {
+            val startSecond = endTime.substring(10, 12).toInt - startTime.substring(10, 12).toInt
             dataArray.update(startIndex, dataArray(startIndex) + startSecond)
           } else {
-            val startSecond = 60 - startTime.takeRight(2).toInt
-            val endSecond = endTime.takeRight(2).toInt
+            val startSecond = 60 - startTime.substring(10, 12).toInt
+            val endSecond = endTime.substring(10, 12).toInt
             dataArray.update(startIndex, dataArray(startIndex) + startSecond)
             dataArray.update(endIndex, dataArray(endIndex) + endSecond)
             startIndex += 1
@@ -114,22 +113,26 @@ object SaveToHiveByMinute {
             combination = s"$dt$platform$source_type"
           )
         }
-
-        //合并全频道
-        baseData ++= baseData.groupBy(x => (x.area_code,x.view_time,x.source_type,x.combination))
-          .map(x => LiveViewTime("-1",x._1._1,x._1._2,x._1._4,
-            x._2.map(_.duration).sum,x._2.map(_.dt).toList(0),x._1._3,x._2.map(_.platform).toList(0)))
-        //全区域合并
-        baseData ++= baseData.groupBy(x => (x.conf_channel_id,x.view_time,x.source_type,x.combination))
-          .map(x => LiveViewTime(x._1._1,"14300",x._1._2,x._1._4,
-            x._2.map(_.duration).sum,x._2.map(_.dt).toList(0),x._1._3,x._2.map(_.platform).toList(0)))
-
         baseData
-      })
-      .as[LiveViewTime].toDF()
+      }).rdd
+    secondDf.cache()
 
-    kudu.upsertRows(secondDf, "kd_live_minute")
-   // kudu.insertRows(secondDf, "kd_live_minute")
+    //合并频道
+    val channelRDD = secondDf.union(secondDf.groupBy(x => (x.area_code, x.view_time, x.source_type, x.combination))
+      .map(x => LiveViewTime("-1", x._1._1, x._1._2, x._1._4,
+        x._2.map(_.duration).sum, x._2.map(_.dt).toList(0), x._1._3, x._2.map(_.platform).toList(0)))
+    )
+    channelRDD.cache()
+    secondDf.unpersist()
+
+    //合并区域
+    val areacodeRDD = channelRDD.union(channelRDD.groupBy(x => (x.conf_channel_id, x.view_time, x.source_type, x.combination))
+      .map(x => LiveViewTime(x._1._1, "14300", x._1._2, x._1._4,
+        x._2.map(_.duration).sum, x._2.map(_.dt).toList(0), x._1._3, x._2.map(_.platform).toList(0))))
+      .toDF()
+    channelRDD.unpersist()
+
+    kudu.insertRows(areacodeRDD, "kd_live_minute")
 
 
   }
