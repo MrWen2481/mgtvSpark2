@@ -80,7 +80,15 @@ object YDSdk {
     })
       .map { x =>
         val data = x.split("\\|", -1)
-        data(0) match {
+        //兼容 业务标识前有日期的问题 2018-06-03 06:50:19 - 36.157.241.156 - 0x03|
+        var filed = ""
+        if (data(0).contains("-") && data(0).contains(".")){
+          filed = data(0).substring(data(0).lastIndexOf("0x"),data(0).length)
+        }else{
+          filed = data(0)
+        }
+
+        filed match {
           /*
              直播
              0x03|mac|user_id|operator|create_time|sp_code|play_url|channel_id|channel_name|chan nel_status|watch|status|||
@@ -95,7 +103,7 @@ object YDSdk {
             val channelName = channelNameMap.value.getOrElse(data(index - 3), "")
             val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               play = data(index + 1) == LIVE_PLAY,
@@ -116,7 +124,7 @@ object YDSdk {
           case VOD
             if data.length == 23 && (data(17) == VOD_PLAY || data(17) == VOD_END) =>
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               play = data(17) == VOD_PLAY,
@@ -140,7 +148,7 @@ object YDSdk {
             val conf_channel_code = channelMap.value.getOrElse(data(7), "")
             val channelName = channelNameMap.value.getOrElse(data(7), "")
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               play = data(12) == LOOK_BACK_PLAY,
@@ -170,7 +178,7 @@ object YDSdk {
             val conf_channel_code = channelMap.value.getOrElse(data(index - 1), "")
             val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               play = data(index) == TIME_SHIFT_PLAY,
@@ -201,7 +209,7 @@ object YDSdk {
               }
             }
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               sp_code = data(5),
@@ -232,7 +240,7 @@ object YDSdk {
           case INIT
             if data.length >= 15 =>
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(9),
               create_time = TimeUtils.fastParseSdkDate(data(12)),
               mac = data(2),
@@ -255,7 +263,7 @@ object YDSdk {
           case ORDER
             if data.length >= 21 =>
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               boss_id = data(9),
@@ -278,7 +286,7 @@ object YDSdk {
           case ERROR
             if data.length >= 9 =>
             SourceTmp(
-              state = data(0),
+              state = filed,
               user_id = data(2),
               create_time = TimeUtils.fastParseSdkDate(data(4)),
               error_code = data(8),
@@ -508,7 +516,7 @@ object YDSdk {
       CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
     }
     //直播
-     if (state == "live" || state == "timeShift" || state == "all") {
+    if (state == "live" || state == "timeShift" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_chnl_day
@@ -534,7 +542,7 @@ object YDSdk {
     """.stripMargin)
     }
     //点播
-     if (state == "vod" || state == "all") {
+    if (state == "vod" || state == "all") {
       spark.sql(
         s"""
            |
@@ -715,7 +723,7 @@ object YDSdk {
       spark.sqlContext.uncacheTable("addvod")
     }
     //回看
-     if (state == "lookback" || state == "all") {
+    if (state == "lookback" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_tvod_day
@@ -741,7 +749,7 @@ object YDSdk {
       """.stripMargin)
     }
     //时移
-     if (state == "timeshift" || state == "all") {
+    if (state == "timeshift" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_timeshift_day
@@ -763,7 +771,7 @@ object YDSdk {
       """.stripMargin)
     }
     //页面访问
-     if (state == "pageview" || state == "all") {
+    if (state == "pageview" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_pageview_day
@@ -801,7 +809,7 @@ object YDSdk {
       """.stripMargin)
     }
     //订购
-     if (state == "order" || state == "all") {
+    if (state == "order" || state == "all") {
       //正则获取大版本apkVersion
       val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
       spark.udf.register("parent_apk", func = (apkVersion: String) => {
