@@ -45,9 +45,7 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
         return TimeUtils.plusMinute(tmp.play_start_time, 5)
       }
     }
-    if (TimeUtils.getDuration(tmp.play_start_time, endTime) > CommonProcess.getMaxViewTimeFilterTimeByState(tmp.state)) {
-      return TimeUtils.plusMinute(tmp.play_start_time, 5)
-    }
+
     //这里还要判断一下是否重新开过机
     val initTime = initTimeSet.lower(endTime)
     val lastHeartTime = heartCreateTimeSet.lower(endTime)
@@ -55,13 +53,14 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
     if (initTime != null && initTime > tmp.play_start_time) {
       //取开机前的上一次心跳时间
       val heartTime = heartCreateTimeSet.lower(initTime)
+
       if (heartTime != null && heartTime > tmp.play_start_time) {
         return heartTime
       } else {
         return TimeUtils.plusMinute(tmp.play_start_time, 5)
       }
     }
-    //开始时间后，下个业务时间前，没有最后一条心跳时间，判断开始时间与下个业务时间的差是否在4个心跳时间内
+
     //心跳不为空
     if (lastHeartTime != null && lastHeartTime > tmp.play_start_time) {
       val duration = TimeUtils.getDuration(lastHeartTime, endTime)
@@ -70,6 +69,9 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
       } else {
         return lastHeartTime
       }
+    }
+    if (TimeUtils.getDuration(tmp.play_start_time, endTime) > CommonProcess.getMaxViewTimeFilterTimeByState(tmp.state)) {
+      return TimeUtils.plusMinute(tmp.play_start_time, 5)
     }
     endTime
   }
