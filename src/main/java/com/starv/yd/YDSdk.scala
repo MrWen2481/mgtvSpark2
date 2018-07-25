@@ -250,7 +250,7 @@ object YDSdk {
               ip = data(7),
               user_account = data(8),
               os = data(11),
-              regionid = data(14),
+              regionid = "14301",
               sdk_version = data(15),
               platform = platform,
               source_type = MGTVConst.SDK
