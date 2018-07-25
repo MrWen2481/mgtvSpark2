@@ -878,6 +878,8 @@ object YDSdk {
            | t.product_name,
            | t.pagename,
            | t.create_time,
+           | t.confirmation,
+           | t.status,
            | p.dt,
            | p.platform
            |from
@@ -902,7 +904,7 @@ object YDSdk {
               pagename = line.pagename
             }
           }
-          else if (line.state == "0x09"){
+          else if (line.state == "0x09" && line.confirmation == "1" && line.status == "1"){
             line.pagename=pagename
             ol += line
           }
