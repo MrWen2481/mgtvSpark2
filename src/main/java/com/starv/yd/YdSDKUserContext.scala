@@ -55,6 +55,16 @@ class YdSDKUserContext(dataList: List[SourceTmp]) {
       val heartTime = heartCreateTimeSet.lower(initTime)
 
       if (heartTime != null && heartTime > tmp.play_start_time) {
+        //判断是否有二次开机
+        val secondInit = initTimeSet.lower(heartTime)
+        if (secondInit != null && secondInit > tmp.play_start_time){
+          //获取二次开机前的上一条心跳
+          val secondHeart = heartCreateTimeSet.lower(secondInit)
+          if (secondHeart != null && secondHeart > tmp.play_start_time){
+            return secondHeart
+          }
+        }
+
         return heartTime
       } else {
         return TimeUtils.plusMinute(tmp.play_start_time, 5)

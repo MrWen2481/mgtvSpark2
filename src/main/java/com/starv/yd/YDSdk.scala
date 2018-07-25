@@ -5,7 +5,7 @@ import java.util.regex.Pattern
 
 import com.starv.SourceTmp
 import com.starv.common.{CommonProcess, MGTVConst}
-import com.starv.table.owlx.{MidVodDay, ResVodDay}
+import com.starv.table.owlx.{MidVodDay, OrderReleva, ResVodDay}
 import com.starv.utils.{BroadcastUtils, TimeUtils}
 import com.starv.yd.YDConst._
 import org.apache.commons.lang3.StringUtils
@@ -537,8 +537,27 @@ object YDSdk {
            |  from
            | t , p
            | where t.user_id = p.user_id
-           | and t.state in ('$live','$timeShift')
-           |
+           | and t.state = '$live'
+           |union all
+           |select
+           |  distinct
+           |  t.user_id,
+           |  p.regionid,
+           |  t.play_start_time,
+           |  t.play_end_time,
+           |  t.channel_id,
+           |  '',
+           |  t.conf_channel_code,
+           |  p.apk_version,
+           |  t.live_flag,
+           |  t.is_timeshift,
+           |  p.dt,
+           |  p.platform,
+           |  p.source_type
+           |  from
+           | t , p
+           | where t.user_id = p.user_id
+           | and t.state = '$timeShift'
     """.stripMargin)
     }
     //点播
@@ -846,6 +865,69 @@ object YDSdk {
            |where t.user_id=p.user_id
            |and t.state='$order'
       """.stripMargin)
+
+      //关联订购
+      spark.sql(
+        s"""
+           |select
+           | t.state,
+           | t.user_id,
+           | p.regionid,
+           | t.media_name,
+           | parent_apk(p.apk_version) as apk_version,
+           | t.product_name,
+           | t.pagename,
+           | t.create_time,
+           | p.dt,
+           | p.platform
+           |from
+           |t , p
+           |where
+           |t.user_id=p.user_id and
+           |t.state in ('$order','$pageView')
+      """.stripMargin)
+        .as[OrderReleva].groupByKey(_.user_id).flatMapGroups((key,data) => {
+        val ol = new ListBuffer[OrderReleva]()
+        var pagename = ""
+        val arrdata = data.toArray
+        val sortdata = arrdata.sortBy(_.create_time)
+        val iter = sortdata.toIterator
+        while (iter.hasNext){
+          val line = iter.next()
+          if (line.state == "0x07"){
+            if (pagename == ""){
+              pagename = line.pagename
+            }else {
+              pagename=""
+              pagename = line.pagename
+            }
+          }
+          else if (line.state == "0x09"){
+            line.pagename=pagename
+            ol += line
+          }
+        }
+        ol
+      }).createOrReplaceTempView("orderTmp")
+
+      spark.sql(
+        """
+          |insert overwrite table owlx.mid_order_releva
+          |select
+          | user_id,
+          | regionid,
+          | media_name,
+          | apk_version,
+          | product_name,
+          | pagename,
+          | create_time,
+          | dt,
+          | platform
+          |from orderTmp
+        """.stripMargin)
+
+
+
     }
     //错误
 
