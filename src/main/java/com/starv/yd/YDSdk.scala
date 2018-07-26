@@ -269,9 +269,9 @@ object YDSdk {
               boss_id = data(9),
               product_name = data(8),
               product_price = data(10),
-              media_id = data(12),
-              media_name = data(13),
-              category_id = data(14),
+              media_id = data(11),
+              media_name = data(12),
+              category_id = data(13),
               channel_id = data(20),
               status = data(17),
               pagepath = data(6),
@@ -773,6 +773,7 @@ object YDSdk {
         s"""
            | insert overwrite table owlx.mid_timeshift_day
            | select
+           |   distinct
            |   t.user_id,
            |   p.regionid,
            |   t.play_start_time,

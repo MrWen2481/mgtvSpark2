@@ -58,6 +58,7 @@ case class SourceTmp(
                       boss_id: String ="",
                       product_price: String ="",
                       status: String ="",
+                      confirmation: String ="",
                       error_code: String ="",
                       error_detail: String =""
                     )
