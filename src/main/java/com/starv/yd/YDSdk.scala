@@ -5,7 +5,7 @@ import java.util.regex.Pattern
 
 import com.starv.SourceTmp
 import com.starv.common.{CommonProcess, MGTVConst}
-import com.starv.table.owlx.{MidVodDay, OrderReleva, ResVodDay}
+import com.starv.table.owlx._
 import com.starv.utils.{BroadcastUtils, TimeUtils}
 import com.starv.yd.YDConst._
 import org.apache.commons.lang3.StringUtils
@@ -565,7 +565,7 @@ object YDSdk {
       spark.sql(
         s"""
            |
-         | select
+           | select
            |   t.user_id as uuid,
            |   p.regionid ,
            |   t.play_start_time ,
@@ -589,7 +589,7 @@ object YDSdk {
       spark.sql(
         s"""
            |
-         |select
+           |select
            |   a.uuid,
            |   a.regionid ,
            |   a.play_start_time ,
@@ -790,6 +790,17 @@ object YDSdk {
            |
       """.stripMargin)
     }
+
+
+    //正则获取大版本apkVersion
+    val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
+    spark.udf.register("parent_apk", func = (apkVersion: String) => {
+      val matcher = pattern.matcher(apkVersion)
+      if (matcher.find())
+        matcher.group(1)
+      else
+        ""
+    })
     //页面访问
     if (state == "pageview" || state == "all") {
       spark.sql(
@@ -827,18 +838,135 @@ object YDSdk {
            | and t.state = '$pageView'
            |
       """.stripMargin)
+
+
+      //全路径
+      spark.sql(
+        s"""
+           |select
+           | t.state,
+           | t.user_id,
+           | t.create_time,
+           | t.pagename,
+           | parent_apk(p.apk_version) as apk_version,
+           | p.dt,
+           | p.platform
+           |from
+           | t,p
+           |where t.user_id=p.user_id and
+           |t.state in ('$init','$pageView')
+        """.stripMargin).as[FullPagePath].groupByKey(_.user_id).flatMapGroups((_,data) => {
+        val lb = new ListBuffer[FullPageTable]()
+        var pageName1, pageName2, pageName3 = ""
+        var initTime = ""
+        var uuid = ""
+        data.toList.sortBy(_.create_time)
+          .filter(x => (x.state == init || (x.state == pageView &&  x.pagename != "")))
+          // .filter(x => x.create_time != null)
+          .foreach(x =>{
+          if (x.state.equals(init)){
+            initTime=x.create_time
+          }else{
+            if (x.state.equals(pageView) && TimeUtils.getMattleDuration(initTime,x.create_time)<0){
+              //没有开机的情况
+              if (pageName1 == ""){
+                pageName1 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,"","",pageName1)
+              }else if (pageName2 == ""){
+                pageName2 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,"",pageName1,pageName2)
+              }else if (pageName3 == ""){
+                pageName3 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,pageName1,pageName2,pageName3)
+              }else{
+                pageName1 = pageName2
+                pageName2 = pageName3
+                pageName3 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,pageName1,pageName2,pageName3)
+                initTime=""
+              }
+            }else if(x.state.equals(pageView) && TimeUtils.getMattleDuration(initTime,x.create_time)>0){
+              //有开机的情况，重置
+              if (pageName1 == ""){
+                pageName1 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,"","",pageName1)
+              }else if (pageName2 == ""){
+                pageName2 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,"",pageName1,pageName2)
+              }else if (pageName3 == ""){
+                pageName3 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,pageName1,pageName2,pageName3)
+              }else{
+                pageName1 = pageName2
+                pageName2 = pageName3
+                pageName3 = x.pagename
+                uuid = x.user_id
+                lb += FullPageTable(uuid,pageName1,pageName2,pageName3)
+                initTime=""
+              }
+            }
+          }
+
+        })
+        //补结尾
+        if (pageName2 == ""){
+          lb += FullPageTable(uuid,pageName1,"","")
+        }else if (pageName3 == ""){
+          lb += FullPageTable(uuid,pageName1,pageName2,"")
+          lb += FullPageTable(uuid,pageName2,"","")
+        }else{
+          lb += FullPageTable(uuid,pageName2,pageName3,"")
+          lb += FullPageTable(uuid,pageName3,"","")
+          pageName1=""
+          pageName2=""
+          pageName3= ""
+        }
+        lb
+      }).createOrReplaceTempView("fp")
+
+      spark.sql(
+        """
+          |select
+          | fp.page_name,
+          | fp.page_name2,
+          | fp.page_name3,
+          | count(1) as ct,
+          | max(parent_apk(p.apk_version)) as apk_version,
+          | max(p.dt) as dt,
+          | max(p.platform) as platform
+          |from
+          | fp,p
+          |where
+          | fp.user_id=p.user_id
+          |group by
+          | fp.page_name,
+          | fp.page_name2,
+          | fp.page_name3
+        """.stripMargin).createOrReplaceTempView("tp")
+      spark.sqlContext.cacheTable("tp")
+      spark.sql(
+        """
+          |insert overwrite table owlx.mid_path_statis
+          |select * from tp
+        """.stripMargin)
+      spark.sql(
+        """
+          |select * from tp
+        """.stripMargin).as[FullPathResult].groupByKey(_.page_name).flatMapGroups((_,data)=>{
+        data.toList.sortBy(x=>(x.pv,false)).take(19)
+      })
+
     }
     //订购
     if (state == "order" || state == "all") {
-      //正则获取大版本apkVersion
-      val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
-      spark.udf.register("parent_apk", func = (apkVersion: String) => {
-        val matcher = pattern.matcher(apkVersion)
-        if (matcher.find())
-          matcher.group(1)
-        else
-          ""
-      })
+
       spark.sql(
         s"""
            |insert overwrite table owlx.mid_order_day
