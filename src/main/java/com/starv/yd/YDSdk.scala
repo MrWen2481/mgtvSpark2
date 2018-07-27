@@ -862,12 +862,12 @@ object YDSdk {
         var uuid = ""
         data.toList.sortBy(_.create_time)
           .filter(x => (x.state == init || (x.state == pageView &&  x.pagename != "")))
-          // .filter(x => x.create_time != null)
+           .filter(x => x.create_time != null && x.create_time !="")
           .foreach(x =>{
           if (x.state.equals(init)){
             initTime=x.create_time
           }else{
-            if (x.state.equals(pageView) && TimeUtils.getMattleDuration(initTime,x.create_time)<0){
+            if (x.state.equals(pageView) && TimeUtils.getDuration(initTime,x.create_time)<0){
               //没有开机的情况
               if (pageName1 == ""){
                 pageName1 = x.pagename
@@ -889,7 +889,7 @@ object YDSdk {
                 lb += FullPageTable(uuid,pageName1,pageName2,pageName3)
                 initTime=""
               }
-            }else if(x.state.equals(pageView) && TimeUtils.getMattleDuration(initTime,x.create_time)>0){
+            }else if(x.state.equals(pageView) && TimeUtils.getDuration(initTime,x.create_time)>0){
               //有开机的情况，重置
               if (pageName1 == ""){
                 pageName1 = x.pagename

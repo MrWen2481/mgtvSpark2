@@ -59,11 +59,6 @@ object TimeUtils {
       .getTime) / 1000
   }
 
-  def getMattleDuration(startTime: String, endTime: String): Long = {
-    (DateUtils.parseDate(endTime, "yyyy-MM-dd'T'HH:mm:ssZ").getTime - DateUtils.parseDate(startTime, "yyyy-MM-dd'T'HH:mm:ssZ")
-      .getTime) / 1000
-  }
-
   def main(args: Array[String]): Unit = {
     println(getDuration("20180101235959", "20180102000030"))
   }
