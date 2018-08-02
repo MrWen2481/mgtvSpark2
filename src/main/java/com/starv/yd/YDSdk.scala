@@ -41,8 +41,15 @@ object YDSdk {
     val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + s"/*,/warehouse/HNYD/sdk_0x*/dt=$dt/*,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*").toDS()
     //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + "/*.log").toDS()
 
+    val initRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*").toDS()
 
-    process(source, spark, dt, platform, state)
+    if (args(2) == "init"){
+      initData(initRdd,spark,dt,platform)
+    }else{
+      process(source, spark, dt, platform, state)
+    }
+
+
   }
 
   /**
@@ -51,6 +58,33 @@ object YDSdk {
     * @param spark sparkSession
     * @param dt    哪一天
     */
+
+  def initData(files: Dataset[String], spark: SparkSession, dt: String, platform: String): Unit = {
+    import spark.implicits._
+    files.flatMap(_.split("\\\\x0A")).filter(x => {
+      //过滤时间格式错乱的数据
+      val keys = x.split("\\|", -1)
+        Try(TimeUtils.fastParseSdkDate(keys(12))).isSuccess
+    }).map(x=> {
+      val keys = x.split("\\|",-1)
+      Init(
+        user_id = keys(9),
+        create_time = keys(12),
+        regionid = "14301",
+        apk_version = keys(4),
+        dt = dt,
+        platform = platform,
+        source_type = MGTVConst.SDK
+      )
+    }).createOrReplaceTempView("init")
+    spark.sql(
+      """
+        |insert overwrite table owlx.res_power_on_day
+        |select * from init
+      """.stripMargin)
+
+  }
+
   def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String, state: String): Unit = {
     val channelMap = BroadcastUtils.getChannelMap(spark)
     val channelNameMap = BroadcastUtils.getChannelName(spark)
@@ -353,7 +387,8 @@ object YDSdk {
           .filter(_.create_time.startsWith(dt))
 
         //开机 每个用户只入最后一条
-        val initList = dataList.filter(_.state == INIT)//.filter(_.create_time.startsWith(dt))
+        val initList = dataList.filter(_.state == INIT)
+          .filter(!_.create_time.startsWith(upDate(dt))).filter(!_.create_time.startsWith(afterDate(dt)))
         if (initList.nonEmpty) {
           resultList += initList.maxBy(_.create_time)
         }
@@ -498,23 +533,23 @@ object YDSdk {
       """.stripMargin)
 
     //开机
-    if (state == "init" || state == "all") {
-      var df = spark.sql(
-        s"""
-           | select
-           |  user_id,
-           |  create_time,
-           |  regionid,
-           |  apk_version,
-           |  '$dt',
-           |  platform,
-           |  source_type
-           | from
-           |   t
-           |  where state = '$init'
-          """.stripMargin)
-      CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
-    }
+//    if (state == "init" || state == "all") {
+//      var df = spark.sql(
+//        s"""
+//           | select
+//           |  user_id,
+//           |  create_time,
+//           |  regionid,
+//           |  apk_version,
+//           |  '$dt',
+//           |  platform,
+//           |  source_type
+//           | from
+//           |   t
+//           |  where state = '$init'
+//          """.stripMargin)
+//      CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
+//    }
     //直播
     if (state == "live" || state == "timeShift" || state == "all") {
       spark.sql(
