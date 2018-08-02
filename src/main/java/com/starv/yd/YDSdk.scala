@@ -353,7 +353,7 @@ object YDSdk {
           .filter(_.create_time.startsWith(dt))
 
         //开机 每个用户只入最后一条
-        val initList = dataList.filter(_.state == INIT).filter(_.create_time.startsWith(dt))
+        val initList = dataList.filter(_.state == INIT)//.filter(_.create_time.startsWith(dt))
         if (initList.nonEmpty) {
           resultList += initList.maxBy(_.create_time)
         }
