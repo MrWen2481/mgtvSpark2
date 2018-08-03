@@ -43,8 +43,11 @@ object YDSdk {
 
     val initRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*").toDS()
 
-    if (args(2) == "init"){
+    if (args(2) == "init" ){
       initData(initRdd,spark,dt,platform)
+    }else if (args == "all"){
+      initData(initRdd,spark,dt,platform)
+      process(source, spark, dt, platform, state)
     }else{
       process(source, spark, dt, platform, state)
     }
