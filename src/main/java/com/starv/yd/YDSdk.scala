@@ -45,7 +45,7 @@ object YDSdk {
 
     if (args(2) == "init" ){
       initData(initRdd,spark,dt,platform)
-    }else if (args == "all"){
+    }else if (args(2) == "all"){
       initData(initRdd,spark,dt,platform)
       process(source, spark, dt, platform, state)
     }else{
