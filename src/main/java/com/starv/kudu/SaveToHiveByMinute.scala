@@ -75,9 +75,6 @@ object SaveToHiveByMinute {
           timeMap += (timeStr -> i)
         }
 
-        // val timeMapBD = spark.sparkContext.broadcast(timeMap).value
-
-
         dataList.foreach(line => {
           val Array(startTime, endTime) = line._2.split("\\|", -1)
           var startIndex = timeMap(startTime.takeRight(6).take(4) + "00")
