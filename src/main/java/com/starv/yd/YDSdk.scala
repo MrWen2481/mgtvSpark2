@@ -735,7 +735,12 @@ object YDSdk {
           }
           //没有上报栏目id
           if (StringUtils.isEmpty(category_id)) {
-            fillMatchCategoryData()
+            for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
+              val resVodTmp = resVodDay.copy()
+              resVodTmp.category_id = categoryId
+              resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+              resVodList += resVodTmp
+            }
           } else {
             //通过上报的栏目id获取真实的栏目id和频道id
             val option = ydCategoryIdAndChannelIdMap.value.get(category_id)
@@ -743,11 +748,16 @@ object YDSdk {
               val categoryIdAndChannelId = option.get
               resVodDay.category_id = categoryIdAndChannelId._1
               resVodDay.channel_id = categoryIdAndChannelId._2
+              resVodList += resVodDay
             } else {
               //上报的栏目id 匹配不到结果的话 老套路 根据媒资id匹配去
-              fillMatchCategoryData()
+              for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
+                val resVodTmp = resVodDay.copy()
+                resVodTmp.category_id = categoryId
+                resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+                resVodList += resVodTmp
+              }
             }
-            resVodList += resVodDay
           }
 
           //审片栏目和 flag业务逻辑计算
@@ -764,10 +774,12 @@ object YDSdk {
               }
             })
           })
-          val maybeVodDay = resVodList.find(_.flag != MGTVConst.VOD_FILTER_FLAG)
-          if (maybeVodDay.nonEmpty) {
-            maybeVodDay.get.flag = MGTVConst.VOD_PROGRAM_FLAG
-          }
+          resVodList.filter(_.flag != "2")
+            .groupBy(_.channel_id).foreach(x=>{
+            val data = x._2.toIterator
+            val line = data.next()
+            line.flag = "0"
+          })
           resVodList
         })
         .createOrReplaceTempView("res_vod_tmp")

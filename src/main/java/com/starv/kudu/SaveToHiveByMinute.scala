@@ -43,7 +43,7 @@ object SaveToHiveByMinute {
     import spark.implicits._
     import spark.sql
 
-    val kudu = new KuduContext("m01:7051,m02:7051", spark.sparkContext)
+    val kudu = new KuduContext("bigdata-10-43:7051,bigdata-10-44:7051", spark.sparkContext)
 
     val secondDf = sql(
       s"""
