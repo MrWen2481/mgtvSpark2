@@ -719,15 +719,7 @@ object YDSdk {
           val media_id: String = resVodDay.media_id
           val category_id: String = resVodDay.category_id
 
-          // 根据媒资id匹配栏目id和频道id
-          def fillMatchCategoryData() = {
-            for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
-              val resVodTmp = resVodDay.copy()
-              resVodTmp.category_id = categoryId
-              resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
-              resVodList += resVodTmp
-            }
-          }
+
 
           //如果没有上报媒资名称 取一下媒资库中的数据
           if (StringUtils.isEmpty(media_name)) {
