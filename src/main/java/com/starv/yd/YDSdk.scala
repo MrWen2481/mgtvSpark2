@@ -42,13 +42,18 @@ object YDSdk {
     //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + "/*.log").toDS()
 
     val initRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*").toDS()
+    val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*,/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
 
     if (args(2) == "init" ){
       initData(initRdd,spark,dt,platform)
     }else if (args(2) == "all"){
       initData(initRdd,spark,dt,platform)
+      favData(favRdd,spark,dt,platform)
       process(source, spark, dt, platform, state)
-    }else{
+    }else if (args(2) == "fav"){
+      favData(favRdd,spark,dt,platform)
+    }
+    else{
       process(source, spark, dt, platform, state)
     }
 
@@ -86,6 +91,80 @@ object YDSdk {
         |select * from init
       """.stripMargin)
 
+  }
+
+  def favData(files: Dataset[String], spark: SparkSession, dt: String, platform: String): Unit = {
+    import spark.implicits._
+    files.flatMap(_.split("\\\\x0A")).filter(x => {
+      //过滤时间格式错乱的数据
+      val keys = x.split("\\|", -1)
+      if (keys(0).equals(INIT)) {
+        Try(TimeUtils.fastParseSdkDate(keys(12))).isSuccess
+      } else {
+        Try(TimeUtils.fastParseSdkDate(keys(4))).isSuccess
+      }
+    }).map(x=> {
+      val data = x.split("\\|",-1)
+      //兼容 业务标识前有日期的问题 2018-06-03 06:50:19 - 36.157.241.156 - 0x03|
+      var filed = ""
+      if (data(0).contains("-") && data(0).contains(".")){
+        filed = data(0).substring(data(0).lastIndexOf("0x"),data(0).length)
+      }else{
+        filed = data(0)
+      }
+      filed match {
+        case VOD
+          if data.length == 23 && data(17).equals("button_favorite") =>
+          SourceTmp(
+            state = filed,
+            user_id = data(2),
+            create_time = TimeUtils.fastParseSdkDate(data(4)),
+            //这里存的是频道id
+            media_id = data(6),
+            media_name = data(7),
+            //增加用户收藏 取消收藏信息
+            vodstate = data(18),
+            status = data(14),
+            platform = platform,
+            source_type = MGTVConst.SDK
+          )
+        case INIT
+          if data.length >= 15 =>
+          SourceTmp(
+            state = filed,
+            user_id = data(9),
+            create_time = TimeUtils.fastParseSdkDate(data(12)),
+            apk_version = data(4),
+            //regionid = data(14),
+            regionid = "14301",
+            platform = platform,
+            source_type = MGTVConst.SDK
+          )
+        case _ => SourceTmp(
+          state = YDConst.ERROR,
+          user_id = data(2),
+          create_time = TimeUtils.fastParseSdkDate(data(4)),
+          platform = platform,
+          source_type = MGTVConst.SDK
+        )
+      }
+    }).createOrReplaceTempView("f")
+    spark.sqlContext.cacheTable("f")
+    spark.sql(
+      s"""
+         |select user_id,apk_version,regionid,platform,source_type,$dt as dt from f where state = '$INIT'
+      """.stripMargin).createOrReplaceTempView("i")
+    spark.sql(
+      s"""
+         |insert overwrite table owlx.mid_fav_day
+         |select
+         |   i.apk_version,f.user_id as uuid,i.regionid ,f.media_id ,f.media_name,
+         |   f.status,f.create_time,f.vodstate,i.dt,i.platform,i.source_type
+         | from f , i
+         | where f.user_id = i.user_id
+         | and f.state = '$VOD'
+        """.stripMargin)
+    spark.sqlContext.uncacheTable("f")
   }
 
   def process(files: Dataset[String], spark: SparkSession, dt: String, platform: String, state: String): Unit = {
@@ -213,6 +292,7 @@ object YDSdk {
             }
 
             val conf_channel_code = channelMap.value.getOrElse(data(index - 1), "")
+            val channelName = channelNameMap.value.getOrElse(data(index - 1), "")
             val live_flag = if (conf_channel_code == "") LIVE_NOT_MATCH else LIVE_MATCH
             SourceTmp(
               state = filed,
@@ -222,6 +302,7 @@ object YDSdk {
               //这里存的是频道id
               conf_channel_code = conf_channel_code,
               channel_id = data(index - 1),
+              channel_name = channelName,
               live_flag = live_flag,
               is_timeshift = "1",
               platform = platform,
@@ -584,7 +665,7 @@ object YDSdk {
            |  t.play_start_time,
            |  t.play_end_time,
            |  t.channel_id,
-           |  '',
+           |  t.channel_name,
            |  t.conf_channel_code,
            |  p.apk_version,
            |  t.live_flag,
@@ -822,6 +903,7 @@ object YDSdk {
            |   t.play_end_time,
            |   t.channel_id,
            |   p.apk_version,
+           |   t.channel_name,
            |   p.dt,
            |   p.platform,
            |   p.source_type
