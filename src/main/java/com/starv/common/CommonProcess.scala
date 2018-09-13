@@ -182,6 +182,54 @@ object CommonProcess {
     res
   }
 
+  def getYdRegionId(areaCode: String): String = {
+
+    var res = "14301"
+    if (areaCode == "07300" || areaCode =="14306") {
+      res = "14306"
+    }
+    else if (areaCode == "07311" || areaCode =="14303") {
+      res = "14303"
+    }
+    else if (areaCode == "07312" || areaCode == "14302") {
+      res = "14302"
+    }
+    else if (areaCode == "07340" || areaCode == "14304") {
+      res = "14304"
+    }
+    else if (areaCode == "07350" || areaCode == "14310") {
+      res = "14310"
+    }
+    else if (areaCode == "07360" || areaCode == "14307") {
+      res = "14307"
+    }
+    else if (areaCode == "07370" || areaCode == "14309") {
+      res = "14309"
+    }
+    else if (areaCode == "07380" || areaCode == "14313") {
+      res = "14313"
+    }
+    else if (areaCode == "07390" || areaCode == "14305") {
+      res = "14305"
+    }
+    else if (areaCode == "07440" || areaCode == "14308") {
+      res = "14308"
+    }
+    else if (areaCode == "07450" || areaCode == "14312") {
+      res = "14312"
+    }
+    else if (areaCode == "07460" || areaCode == "14311") {
+      res = "14311"
+    }
+    else if (areaCode == "07430" || areaCode == "14331") {
+      res = "14331"
+    }
+    else {
+      res = "14301"
+    }
+
+    res
+  }
 
   def getLtAreaCodeMap: Map[String, String] = {
 

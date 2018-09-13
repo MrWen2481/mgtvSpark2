@@ -39,7 +39,7 @@ object YDSdk {
     import spark.implicits._
 
     val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + s"/*,/warehouse/HNYD/sdk_0x*/dt=$dt/*,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*").toDS()
-    //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + upDate(dt) + "/*.log").toDS()
+    //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*.log").toDS()
 
     val initRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*").toDS()
     val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*,/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
