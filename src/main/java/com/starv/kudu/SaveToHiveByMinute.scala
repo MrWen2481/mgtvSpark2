@@ -80,12 +80,12 @@ object SaveToHiveByMinute {
           var startIndex = timeMap(startTime.takeRight(6).take(4) + "00")
           val endIndex = timeMap(endTime.takeRight(6).take(4) + "00")
           //开始结束是在同一分钟内的
-          if (startTime.substring(10, 12) == endTime.substring(10, 12)) {
-            val startSecond = endTime.substring(10, 12).toInt - startTime.substring(10, 12).toInt
+          if (startTime.takeRight(6).take(4) == endTime.takeRight(6).take(4)) {
+            val startSecond = endTime.takeRight(6).takeRight(2).toInt - startTime.takeRight(6).takeRight(2).toInt
             dataArray.update(startIndex, dataArray(startIndex) + startSecond)
           } else {
-            val startSecond = 60 - startTime.substring(10, 12).toInt
-            val endSecond = endTime.substring(10, 12).toInt
+            val startSecond = 60 - startTime.takeRight(6).takeRight(2).toInt
+            val endSecond = endTime.takeRight(6).takeRight(2).toInt
             dataArray.update(startIndex, dataArray(startIndex) + startSecond)
             dataArray.update(endIndex, dataArray(endIndex) + endSecond)
             startIndex += 1

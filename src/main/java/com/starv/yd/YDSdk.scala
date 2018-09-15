@@ -114,7 +114,7 @@ object YDSdk {
       }
       filed match {
         case VOD
-          if data.length == 23 && data(17).equals("button_favorite") =>
+          if data.length >= 20 && data(17).equals("button_favorite") =>
           SourceTmp(
             state = filed,
             user_id = data(2),
@@ -152,7 +152,7 @@ object YDSdk {
     spark.sqlContext.cacheTable("f")
     spark.sql(
       s"""
-         |select user_id,apk_version,regionid,platform,source_type,$dt as dt from f where state = '$INIT'
+         |select distinct user_id,apk_version,regionid,platform,source_type,$dt as dt from f where state = '$INIT'
       """.stripMargin).createOrReplaceTempView("i")
     spark.sql(
       s"""
@@ -160,9 +160,10 @@ object YDSdk {
          |select
          |   i.apk_version,f.user_id as uuid,i.regionid ,f.media_id ,f.media_name,
          |   f.status,f.create_time,f.vodstate,i.dt,i.platform,i.source_type
-         | from f , i
-         | where f.user_id = i.user_id
-         | and f.state = '$VOD'
+         | from f left join i
+         | on f.user_id = i.user_id
+         | where
+         | f.state = '$VOD'
         """.stripMargin)
     spark.sqlContext.uncacheTable("f")
   }
