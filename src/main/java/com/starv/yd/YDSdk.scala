@@ -7,7 +7,7 @@ import com.starv.SourceTmp
 import com.starv.common.{CommonProcess, MGTVConst}
 import com.starv.table.owlx._
 import com.starv.utils.{BroadcastUtils, TimeUtils}
-import com.starv.yd.YDConst._
+import com.starv.yd.YDConst.{VOD, _}
 import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.{Dataset, SparkSession}
 
@@ -78,7 +78,7 @@ object YDSdk {
       Init(
         user_id = keys(9),
         create_time = keys(12),
-        regionid = "14301",
+        regionid = CommonProcess.getYdRegionId(keys(14)),
         apk_version = keys(4),
         dt = dt,
         platform = platform,
@@ -136,7 +136,7 @@ object YDSdk {
             create_time = TimeUtils.fastParseSdkDate(data(12)),
             apk_version = data(4),
             //regionid = data(14),
-            regionid = "14301",
+            regionid = CommonProcess.getYdRegionId(data(14)),
             platform = platform,
             source_type = MGTVConst.SDK
           )
@@ -160,7 +160,8 @@ object YDSdk {
          |select
          |   i.apk_version,f.user_id as uuid,i.regionid ,f.media_id ,f.media_name,
          |   f.status,f.create_time,f.vodstate,i.dt,i.platform,i.source_type
-         | from f left join i
+         | from f
+         | left join (select user_id,apk_version,dt,platform,source_type,regionid from owlx.user_info_pool where dt='$dt' and platform='$platform' and source_type='sdk') i
          | on f.user_id = i.user_id
          | where
          | f.state = '$VOD'
@@ -318,7 +319,7 @@ object YDSdk {
           case PAGE_VIEW
             if data.length >= 26 =>
             val mediaName = mediaNameMap.value.getOrElse(data(16), "")
-            val keyword = data(16)
+            val keyword = data(17)
             var key_name = ""
             if (StringUtils.isNotEmpty(mediaName) && StringUtils.isNotEmpty(keyword)) {
               if (mediaName.trim.length < keyword.trim.length) {
@@ -369,7 +370,7 @@ object YDSdk {
               ip = data(7),
               user_account = data(8),
               os = data(11),
-              regionid = "14301",
+              regionid = CommonProcess.getYdRegionId(data(14)),
               sdk_version = data(15),
               platform = platform,
               source_type = MGTVConst.SDK
@@ -719,7 +720,7 @@ object YDSdk {
            |   a.category_id  ,
            |   a.apk_version,
            |   a.channel_id,
-           |   MD5(concat(a.assetid,b.originalid)) as media_uuid,
+           |   MD5(concat(b.assetid,b.originalid)) as media_uuid,
            |   a.media_second_name,
            |   a.assetid,
            |   nvl(b.originalid,'') as orgin_id,
