@@ -834,20 +834,29 @@ object YDSdk {
               }
             }
           }
-
+          //过滤审片栏目名
+          resVodList.filter(data => {
+            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
+            for (elem <- testCategoryNameList.value){
+              if (data.category_name.startsWith(elem)){
+                false
+              }
+            }
+            true
+          })
           //审片栏目和 flag业务逻辑计算
           resVodList.foreach(data => {
             data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
             data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
-            val breaks = new Breaks
-            breaks.breakable({
-              for (elem <- testCategoryNameList.value) {
-                if (data.category_name.startsWith(elem)) {
-                  data.flag = MGTVConst.VOD_FILTER_FLAG
-                  breaks.break()
-                }
-              }
-            })
+//            val breaks = new Breaks
+//            breaks.breakable({
+//              for (elem <- testCategoryNameList.value) {
+//                if (data.category_name.startsWith(elem)) {
+//                  data.flag = MGTVConst.VOD_FILTER_FLAG
+//                  breaks.break()
+//                }
+//              }
+//            })
           })
           resVodList.filter(_.flag != "2")
             .groupBy(_.channel_id).foreach(x=>{
