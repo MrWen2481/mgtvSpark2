@@ -974,6 +974,248 @@ object YDSdk {
            |
       """.stripMargin)
 
+      //全路径
+      spark.sql(
+        s"""
+           |select
+           | t.state,
+           | t.user_id,
+           | t.create_time,
+           | t.pagename,
+           | parent_apk(p.apk_version) as apk_version,
+           | p.dt,
+           | p.platform
+           |from
+           | t,p
+           |where t.user_id=p.user_id and
+           |t.state in ('$init','$pageView')
+        """.stripMargin).as[FullPagePath].groupByKey(_.user_id).flatMapGroups((_, data) => {
+        val lb = new ListBuffer[FullPageTable]()
+        var pageName1, pageName2, pageName3 = ""
+        var initTime = ""
+        var uuid = ""
+        data.toList.sortBy(_.create_time)
+          .filter(x => (x.state == init || (x.state == pageView && x.pagename != "")))
+          .filter(x => StringUtils.isNoneEmpty(x.create_time))
+          .foreach(x => {
+            if (x.state.equals(init)) {
+              initTime = x.create_time
+            } else {
+              if (initTime != "" && x.state.equals(pageView) && initTime < x.create_time) {
+                //有开机的情况
+                if (pageName1 == "") {
+                  pageName2 = x.pagename
+                  pageName1 = "开机精选"
+                  //pageName1 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, "", pageName1, pageName2)
+                  //lb += FullPageTable(uuid, "", "", pageName1)
+                } else if (pageName2 == "") {
+                  pageName2 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, "", pageName1, pageName2)
+                } else if (pageName3 == "") {
+                  pageName3 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, pageName1, pageName2, pageName3)
+                } else {
+                  pageName1 = pageName2
+                  pageName2 = pageName3
+                  pageName3 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, pageName1, pageName2, pageName3)
+                  initTime = ""
+                }
+              } else if (x.state.equals(pageView) ) {
+                //没有开机的情况
+                if (pageName1 == "") {
+                  pageName1 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, "", "", pageName1)
+                } else if (pageName2 == "") {
+                  pageName2 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, "", pageName1, pageName2)
+                } else if (pageName3 == "") {
+                  pageName3 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, pageName1, pageName2, pageName3)
+                } else {
+                  pageName1 = pageName2
+                  pageName2 = pageName3
+                  pageName3 = x.pagename
+                  uuid = x.user_id
+                  lb += FullPageTable(uuid, pageName1, pageName2, pageName3)
+                }
+              }
+            }
+
+          })
+        //补结尾
+        if (pageName2 == "") {
+          lb += FullPageTable(uuid, pageName1, "", "")
+        } else if (pageName3 == "") {
+          lb += FullPageTable(uuid, pageName1, pageName2, "")
+          lb += FullPageTable(uuid, pageName2, "", "")
+        } else {
+          lb += FullPageTable(uuid, pageName2, pageName3, "")
+          lb += FullPageTable(uuid, pageName3, "", "")
+          pageName1 = ""
+          pageName2 = ""
+          pageName3 = ""
+        }
+        lb
+      }).createOrReplaceTempView("fp")
+
+      spark.sql(
+        """
+          |select
+          | fp.page_name as page_name,
+          | fp.page_name2 as page_name2,
+          | fp.page_name3 as page_name3,
+          | count(1) as ct,
+          | max(parent_apk(p.apk_version)) as apk_version,
+          | max(p.dt) as dt,
+          | max(p.platform) as platform
+          |from
+          | fp,p
+          |where
+          | fp.user_id=p.user_id
+          |group by
+          | fp.page_name,
+          | fp.page_name2,
+          | fp.page_name3
+        """.stripMargin).createOrReplaceTempView("tp")
+      spark.sqlContext.cacheTable("tp")
+      spark.sql(
+        """
+          |insert overwrite table owlx.mid_path_statis
+          |select * from tp
+        """.stripMargin)
+
+      //合并top20
+      spark.sql(
+        """
+          |select
+          | page_name, page_name2, page_name3,ct,
+          | row_number() over (PARTITION BY page_name, page_name2 order by ct desc) as rn,
+          | max(apk_version) apk_version,
+          | max(dt) dt,
+          | max(platform) platform
+          |from tp
+          |group by page_name, page_name2, page_name3,ct
+          |order by rn
+        """.stripMargin).createOrReplaceTempView("page1")
+      spark.sqlContext.cacheTable("page1")
+      spark.sql(
+        """
+          |select page_name,page_name2,page_name3,ct,
+          |apk_version,dt,platform from page1 where rn<=19
+          |union all
+          |select page_name,page_name2,'other',sum(ct),
+          |max(apk_version) apk_version,
+          |max(dt) dt,
+          |max(platform) platform
+          |from page1 where rn>19
+          |group by page_name,page_name2
+          |
+        """.stripMargin).createOrReplaceTempView("page2")
+      spark.sqlContext.cacheTable("page2")
+      spark.sql(
+        """
+          |select
+          | page_name,
+          | page_name2
+          | from
+          | (select
+          | page_name,
+          | page_name2,
+          | row_number() over (PARTITION BY page_name order by sum(ct) desc) as rn
+          |  from page2
+          |  group by page_name, page_name2
+          |  order by rn
+          |  ) t
+          |  where t.rn <= 19
+
+        """.stripMargin).createOrReplaceTempView("page3")
+
+      spark.sql(
+        """
+          |insert overwrite table owlx.mid_path_statis_result
+          |select p2.page_name,p2.page_name2,p2.page_name3,'0',p2.ct,p2.apk_version,p2.dt,p2.platform
+          |from page2 p2,page3 p3 where p2.page_name=p3.page_name and p2.page_name2=p3.page_name2
+          |union all
+          |select p2.page_name,'other','other','0',sum(p2.ct),max(p2.apk_version),max(p2.dt),max(p2.platform)
+          |from page2 p2
+          |where not exists(select 1 from page3 where p2.page_name = page_name and p2.page_name2 = page_name2)
+          |group by p2.page_name
+        """.stripMargin)
+
+      //终点
+      spark.sql(
+        """
+          |select
+          | page_name, page_name2, page_name3,ct,
+          | row_number() over (PARTITION BY page_name2, page_name3 order by ct desc) as rn,
+          | max(apk_version) apk_version,
+          | max(dt) dt,
+          | max(platform) platform
+          |from tp
+          |group by page_name, page_name2, page_name3,ct
+          |order by rn
+        """.stripMargin).createOrReplaceTempView("endpage1")
+      spark.sqlContext.cacheTable("endpage1")
+
+      spark.sql(
+        """
+          |select page_name,page_name2,page_name3,ct,
+          |apk_version,dt,platform from endpage1 where rn<=19
+          |union all
+          |select 'other',page_name2,page_name3,sum(ct),
+          |max(apk_version) apk_version,
+          |max(dt) dt,
+          |max(platform) platform
+          |from endpage1 where rn>19
+          |group by page_name2,page_name3
+          |
+        """.stripMargin).createOrReplaceTempView("endpage2")
+      spark.sqlContext.cacheTable("endpage2")
+      spark.sql(
+        """
+          |select
+          | page_name2,
+          | page_name3
+          | from
+          | (select
+          | page_name2,
+          | page_name3,
+          | row_number() over (PARTITION BY page_name3 order by sum(ct) desc) as rn
+          |  from endpage2
+          |  group by page_name2, page_name3
+          |  order by rn
+          |  ) t
+          |  where t.rn <= 19
+
+        """.stripMargin).createOrReplaceTempView("endpage3")
+
+      spark.sql(
+        """
+          |insert into table owlx.mid_path_statis_result
+          |select p2.page_name,p2.page_name2,p2.page_name3,'1',p2.ct,p2.apk_version,p2.dt,p2.platform
+          |from endpage2 p2,endpage3 p3 where p2.page_name3=p3.page_name3 and p2.page_name2=p3.page_name2
+          |union all
+          |select 'other','other',p2.page_name3,'1',sum(p2.ct),max(p2.apk_version),max(p2.dt),max(p2.platform)
+          |from endpage2 p2
+          |where not exists(select 1 from endpage3 where p2.page_name3 = page_name3 and p2.page_name2 = page_name2)
+          |group by p2.page_name3
+        """.stripMargin)
+
+      spark.sqlContext.uncacheTable("tp")
+      spark.sqlContext.uncacheTable("page1")
+      spark.sqlContext.uncacheTable("page2")
+      spark.sqlContext.uncacheTable("endpage1")
+      spark.sqlContext.uncacheTable("endpage2")
+
     }
     //订购
     if (state == "order" || state == "all") {
