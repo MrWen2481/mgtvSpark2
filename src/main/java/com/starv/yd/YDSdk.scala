@@ -319,6 +319,12 @@ object YDSdk {
           case PAGE_VIEW
             if data.length >= 26 =>
             val mediaName = mediaNameMap.value.getOrElse(data(16), "")
+            var eventtype = ""
+            if (data(18).contains("search")){
+              eventtype = "search"
+            }else{
+              eventtype = data(18)
+            }
             val keyword = data(17)
             var key_name = ""
             if (StringUtils.isNotEmpty(mediaName) && StringUtils.isNotEmpty(keyword)) {
@@ -344,7 +350,7 @@ object YDSdk {
               offset_id = data(14),
               category_id = data(15),
               key = data(17),
-              event_type = data(18),
+              event_type = eventtype,
               keyname = key_name,
               channel_id = data(25),
               offset_group = data(23),
@@ -711,45 +717,50 @@ object YDSdk {
         s"""
            |
            |select
-           |   a.uuid,
-           |   a.regionid ,
-           |   a.play_start_time ,
-           |   a.play_end_time ,
-           |   a.media_id ,
-           |   a.media_name  ,
-           |   a.category_id  ,
-           |   a.apk_version,
-           |   a.channel_id,
-           |   MD5(concat(b.assetid,b.originalid)) as media_uuid,
-           |   a.media_second_name,
-           |   a.assetid,
-           |   nvl(b.originalid,'') as orgin_id,
-           |   a.dt,
-           |   a.platform,
-           |   a.source_type
-           |from (
-           |select
            |   v.uuid,
-           |   v.regionid ,
-           |   v.play_start_time ,
-           |   v.play_end_time ,
-           |   v.media_id ,
-           |   v.media_name  ,
-           |   v.category_id  ,
+           |   v.regionid,
+           |   v.play_start_time,
+           |   v.play_end_time,
+           |   v.media_id,
+           |   v.media_name,
+           |   v.category_id,
            |   v.apk_version,
            |   v.channel_id,
-           |   nvl(m.name,'') as media_second_name,
-           |   nvl(m.assetid,'') as assetid,
+           |   nvl(b.media_uuid,'') as media_uuid,
+           |   nvl(b.media_second_name,'') as media_second_name,
+           |   nvl(b.asset_id,'') as asset_id,
+           |   nvl(b.orgin_id,'') as orgin_id,
            |   v.dt,
            |   v.platform,
            |   v.source_type
-           |   from vod v,
-           |(select contentid,name,assetid from hnyd.db_fonsview_vod where dt='$dt') m
-           |  where v.media_id = m.contentid) a
-           |  left join
-           |  (select assetid,originalid from owlx.db_smedia_vodinfomation  where dt= '$dt') b
-           |  on a.assetid=b.assetid
-           |
+           |from
+           |(select
+           |   uuid,
+           |   regionid,
+           |   play_start_time,
+           |   play_end_time,
+           |   media_id,
+           |   media_name,
+           |   category_id,
+           |   apk_version,
+           |   channel_id,
+           |   dt,
+           |   platform,
+           |   source_type
+           |   from vod ) v
+           |LEFT JOIN
+           |  (SELECT
+           |     thremdeiaid,
+           |     uuid as media_uuid,
+           |     midianame as media_second_name,
+           |     ydmedia as asset_id,
+           |     ltmedia as orgin_id
+           |   FROM
+           |     starv.dict_second_media_vod
+           |   WHERE 	platform = 'HNYD'
+           |          AND dt = '$dt'
+           |  ) b
+           |  ON v.media_id = b.thremdeiaid
        """.stripMargin).createOrReplaceTempView("addvod")
       spark.sqlContext.cacheTable("addvod")
 
