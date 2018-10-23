@@ -31,14 +31,13 @@ object EpgMysqlToKudu {
 
     import spark.implicits._
     val kudu = new KuduContext("bigdata-10-43:7051,bigdata-10-44:7051", spark.sparkContext)
-    kudu.deleteTable("kd_starv_epg")
+
     kudu.insertRows(spark.read
       .format("jdbc")
       .options(StarvConfig.getMysqlJDBCConfig("(select id,day as dt,start_date as start_time,stop_date as end_time,channel_code,program_name,channel_name,title from starv_epg) t"))
       .load
       .as[StarvEpg]
       .toDF, "kd_starv_epg")
-
 
 
 
