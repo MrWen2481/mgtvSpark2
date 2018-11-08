@@ -854,15 +854,15 @@ object YDSdk {
             }
           }
           //过滤审片栏目名
-//          resVodList.filter(data => {
-//            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
-//            for (elem <- testCategoryNameList.value){
-//              if (data.category_name.startsWith(elem)){
-//                false
-//              }
-//            }
-//            true
-//          })
+          resVodList.filter(data => {
+            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
+            for (elem <- testCategoryNameList.value){
+              if (data.category_name.startsWith(elem)){
+                false
+              }
+            }
+            true
+          })
           //审片栏目和 flag业务逻辑计算
           resVodList.foreach(data => {
             data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
@@ -878,7 +878,7 @@ object YDSdk {
 //            })
           })
           resVodList
-           // .filter(_.flag != "2")
+            .filter(_.flag != "2")
             .groupBy(_.channel_id).foreach(x=>{
             val data = x._2.toIterator
             val line = data.next()
