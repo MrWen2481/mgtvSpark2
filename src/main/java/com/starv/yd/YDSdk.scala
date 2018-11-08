@@ -658,6 +658,10 @@ object YDSdk {
            |  p.apk_version,
            |  t.live_flag,
            |  t.is_timeshift,
+           |  LAG(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_code,
+           |  LAG(t.start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
+           |  LEAD(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_code,
+           |  LEAD(t.play_end_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_start_time,
            |  p.dt,
            |  p.platform,
            |  p.source_type
@@ -678,6 +682,10 @@ object YDSdk {
            |  p.apk_version,
            |  t.live_flag,
            |  t.is_timeshift,
+           |  LAG(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_code,
+           |  LAG(t.start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
+           |  LEAD(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_code,
+           |  LEAD(t.play_end_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_start_time,
            |  p.dt,
            |  p.platform,
            |  p.source_type
@@ -846,15 +854,15 @@ object YDSdk {
             }
           }
           //过滤审片栏目名
-          resVodList.filter(data => {
-            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
-            for (elem <- testCategoryNameList.value){
-              if (data.category_name.startsWith(elem)){
-                false
-              }
-            }
-            true
-          })
+//          resVodList.filter(data => {
+//            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
+//            for (elem <- testCategoryNameList.value){
+//              if (data.category_name.startsWith(elem)){
+//                false
+//              }
+//            }
+//            true
+//          })
           //审片栏目和 flag业务逻辑计算
           resVodList.foreach(data => {
             data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
@@ -869,7 +877,8 @@ object YDSdk {
 //              }
 //            })
           })
-          resVodList.filter(_.flag != "2")
+          resVodList
+           // .filter(_.flag != "2")
             .groupBy(_.channel_id).foreach(x=>{
             val data = x._2.toIterator
             val line = data.next()
