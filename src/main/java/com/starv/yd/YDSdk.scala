@@ -42,7 +42,8 @@ object YDSdk {
     //val source = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x*/dt=$dt/*.log,/warehouse/HNYD/sdk_0x*/dt=" + afterDate(dt) + "/*.log").toDS()
 
     val initRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*").toDS()
-    val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*,/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
+    //val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*,/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
+    val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
 
     if (args(2) == "init" ){
       initData(initRdd,spark,dt,platform)
@@ -128,18 +129,18 @@ object YDSdk {
             platform = platform,
             source_type = MGTVConst.SDK
           )
-        case INIT
-          if data.length >= 15 =>
-          SourceTmp(
-            state = filed,
-            user_id = data(9),
-            create_time = TimeUtils.fastParseSdkDate(data(12)),
-            apk_version = data(4),
-            //regionid = data(14),
-            regionid = CommonProcess.getYdRegionId(data(14)),
-            platform = platform,
-            source_type = MGTVConst.SDK
-          )
+//        case INIT
+//          if data.length >= 15 =>
+//          SourceTmp(
+//            state = filed,
+//            user_id = data(9),
+//            create_time = TimeUtils.fastParseSdkDate(data(12)),
+//            apk_version = data(4),
+//            //regionid = data(14),
+//            regionid = CommonProcess.getYdRegionId(data(14)),
+//            platform = platform,
+//            source_type = MGTVConst.SDK
+//          )
         case _ => SourceTmp(
           state = YDConst.ERROR,
           user_id = data(2),
@@ -150,18 +151,21 @@ object YDSdk {
       }
     }).createOrReplaceTempView("f")
     spark.sqlContext.cacheTable("f")
-    spark.sql(
-      s"""
-         |select distinct user_id,apk_version,regionid,platform,source_type,$dt as dt from f where state = '$INIT'
-      """.stripMargin).createOrReplaceTempView("i")
+
+//    spark.sql(
+//      s"""
+//         |select distinct user_id,apk_version,regionid,platform,source_type,$dt as dt from f where state = '$INIT'
+//      """.stripMargin).createOrReplaceTempView("a")
+
     spark.sql(
       s"""
          |insert overwrite table owlx.mid_fav_day
          |select
-         |   i.apk_version,f.user_id as uuid,i.regionid ,f.media_id ,f.media_name,
+         |   nvl(i.apk_version,''),f.user_id as uuid,nvl(i.regionid,'14301') ,f.media_id ,f.media_name,
          |   f.status,f.create_time,f.vodstate,i.dt,i.platform,i.source_type
          | from f
-         | left join (select user_id,apk_version,dt,platform,source_type,regionid from owlx.user_info_pool where dt='$dt' and platform='$platform' and source_type='sdk') i
+         | left join (select user_id,apk_version,dt,platform,source_type,regionid from owlx.user_info_pool
+         | where dt='$dt' and platform='$platform' and source_type='sdk') i
          | on f.user_id = i.user_id
          | where
          | f.state = '$VOD'
@@ -349,6 +353,7 @@ object YDSdk {
               offset_name = data(13),
               offset_id = data(14),
               category_id = data(15),
+              media_id = data(16),
               key = data(17),
               event_type = eventtype,
               keyname = key_name,
@@ -829,11 +834,19 @@ object YDSdk {
           }
           //没有上报栏目id
           if (StringUtils.isEmpty(category_id)) {
-            for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
-              val resVodTmp = resVodDay.copy()
-              resVodTmp.category_id = categoryId
-              resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
-              resVodList += resVodTmp
+            for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array(""))) {
+              if (categoryId == "" && category_id == null){
+                val resVodTmp = resVodDay.copy()
+                resVodTmp.category_id = ""
+                resVodTmp.channel_id = ""
+                resVodList += resVodTmp
+              }else{
+                val resVodTmp = resVodDay.copy()
+                resVodTmp.category_id = categoryId
+                resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+                resVodList += resVodTmp
+              }
+
             }
           } else {
             //通过上报的栏目id获取真实的栏目id和频道id
