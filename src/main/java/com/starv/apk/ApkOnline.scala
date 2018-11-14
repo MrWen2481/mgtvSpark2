@@ -46,17 +46,23 @@ object ApkOnline {
 
     val testUserSet = BroadcastUtils.getFilterUserIdPrev(spark, platform)
     val ltDic = BroadcastUtils.getLtAreaCodeMap(spark)
+    val ydDic = BroadcastUtils.getT_HNYD_RELA(spark)
+
     import spark.implicits._
     spark.read.textFile(s"/warehouse/$platform/itvrun_online/dt=$dt/*")
       .filter(x => Try(JSON.parseObject(x)).isSuccess)
       .map(x => {
         val json = JSON.parseObject(x)
-        val uuid = json.getString("uuid")
+        var uuid = json.getString("uuid")
         var regionid = "14301"
         if (platform == "HNDX") {
           regionid = CommonProcess.getHNDXRegionId(uuid)
         } else if (platform == "HNLT"){
           regionid = CommonProcess.getLtRegionId(uuid, ltDic.value)
+        }
+        else if(platform == "HNYD") {
+          val ydstbMap = ydDic.value
+          uuid = ydstbMap.getOrElse(uuid,uuid)
         }
         val apk_version = json.getString("apk_version")
         MidOnlineDay(

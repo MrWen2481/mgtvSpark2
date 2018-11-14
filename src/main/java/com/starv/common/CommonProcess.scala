@@ -1,5 +1,7 @@
 package com.starv.common
 
+import java.sql.DriverManager
+
 import com.starv.yd.YDConst
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.time.DateUtils
@@ -244,6 +246,21 @@ object CommonProcess {
     ps.close()
     conn.close()
     areaMap
+  }
+
+  def getT_HNYD_RELA: Map[String,String] = {
+    lazy val conn = StarvConfig.getMysqlConn
+    val ps = conn.prepareStatement("SELECT userid,stbid FROM t_hnyd_rela")
+    val res = ps.executeQuery()
+    var channelDic: Map[String, String] = Map()
+    while (res.next()) {
+      channelDic += (res.getString(1) -> res.getString(2))
+    }
+    res.close()
+    ps.close()
+    conn.close()
+
+    channelDic
   }
 
   /**
