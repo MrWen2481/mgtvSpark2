@@ -16,7 +16,7 @@ case class SourceTmp(
                       var play_end_time: String = "",
                       conf_channel_code: String = "",
                       live_flag: String = "",
-                      is_timeshift: String = "0",
+                      var is_timeshift: String = "0",
                       vod_flag: String = "",
                       play: Boolean = false,
                       manufacturers: String = "",

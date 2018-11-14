@@ -669,6 +669,7 @@ object YDSdk {
            | t , p
            | where t.user_id = p.user_id
            | and t.state = '$live'
+           | and t.is_timeshift = '0'
            |union all
            |select
            |  distinct
@@ -693,6 +694,7 @@ object YDSdk {
            | t , p
            | where t.user_id = p.user_id
            | and t.state = '$timeShift'
+           | and t.is_timeshift = '1'
     """.stripMargin)
     }
     //点播
@@ -935,21 +937,42 @@ object YDSdk {
         s"""
            | insert overwrite table owlx.mid_timeshift_day
            | select
-           |   distinct
-           |   t.user_id,
-           |   p.regionid,
-           |   t.play_start_time,
-           |   t.play_end_time,
-           |   t.channel_id,
-           |   p.apk_version,
-           |   t.channel_name,
-           |   p.dt,
-           |   p.platform,
-           |   p.source_type
+           |   user_id,
+           |   regionid,
+           |   play_start_time,
+           |   play_end_time,
+           |   channel_id,
+           |   apk_version,
+           |   channel_name,
+           |   dt,
+           |   platform,
+           |   source_type
+           |   from
+           |   (
+           |select
+           |  distinct
+           |  t.user_id as user_id,
+           |  p.regionid as regionid,
+           |  t.play_start_time as play_start_time,
+           |  t.play_end_time as play_end_time,
+           |  t.channel_id as channel_id,
+           |  t.channel_name as channel_name,
+           |  t.conf_channel_code as conf_channel_code,
+           |  p.apk_version as apk_version,
+           |  t.live_flag as live_flag,
+           |  t.is_timeshift as is_timeshift,
+           |  LAG(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_code,
+           |  LAG(t.play_start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
+           |  LEAD(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_code,
+           |  LEAD(t.play_end_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_start_time,
+           |  p.dt as dt,
+           |  p.platform as platform,
+           |  p.source_type as source_type
            |  from
-           |  t , p
+           | t , p
            | where t.user_id = p.user_id
            | and t.state = '$timeShift'
+           | and t.is_timeshift = '1') ts
            |
       """.stripMargin)
     }
