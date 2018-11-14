@@ -177,4 +177,8 @@ object BroadcastUtils {
     session.sparkContext.broadcast(CommonProcess.getLtAreaCodeMap)
   }
 
+  def getT_HNYD_RELA(session: SparkSession): Broadcast[Map[String, String]] = {
+    session.sparkContext.broadcast(CommonProcess.getT_HNYD_RELA)
+  }
+
 }

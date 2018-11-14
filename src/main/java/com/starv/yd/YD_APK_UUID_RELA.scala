@@ -44,6 +44,5 @@ object YD_APK_UUID_RELA {
 
     new_user.toDF(cols:_*).write.mode("append").jdbc(StarvConfig.url,"t_hnyd_rela",StarvConfig.properties)
 
-
   }
 }
