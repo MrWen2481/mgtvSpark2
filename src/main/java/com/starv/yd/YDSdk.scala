@@ -129,18 +129,18 @@ object YDSdk {
             platform = platform,
             source_type = MGTVConst.SDK
           )
-//        case INIT
-//          if data.length >= 15 =>
-//          SourceTmp(
-//            state = filed,
-//            user_id = data(9),
-//            create_time = TimeUtils.fastParseSdkDate(data(12)),
-//            apk_version = data(4),
-//            //regionid = data(14),
-//            regionid = CommonProcess.getYdRegionId(data(14)),
-//            platform = platform,
-//            source_type = MGTVConst.SDK
-//          )
+        case INIT
+          if data.length >= 15 =>
+          SourceTmp(
+            state = filed,
+            user_id = data(9),
+            create_time = TimeUtils.fastParseSdkDate(data(12)),
+            apk_version = data(4),
+            //regionid = data(14),
+            regionid = CommonProcess.getYdRegionId(data(14)),
+            platform = platform,
+            source_type = MGTVConst.SDK
+          )
         case _ => SourceTmp(
           state = YDConst.ERROR,
           user_id = data(2),
@@ -152,16 +152,11 @@ object YDSdk {
     }).createOrReplaceTempView("f")
     spark.sqlContext.cacheTable("f")
 
-//    spark.sql(
-//      s"""
-//         |select distinct user_id,apk_version,regionid,platform,source_type,$dt as dt from f where state = '$INIT'
-//      """.stripMargin).createOrReplaceTempView("a")
-
     spark.sql(
       s"""
          |insert overwrite table owlx.mid_fav_day
          |select
-         |   nvl(i.apk_version,''),f.user_id as uuid,nvl(i.regionid,'14301') ,f.media_id ,f.media_name,
+         |   nvl(i.apk_version,'') as apk_version,f.user_id as uuid,nvl(i.regionid,'14301') as regionid ,f.media_id ,f.media_name,
          |   f.status,f.create_time,f.vodstate,i.dt,i.platform,i.source_type
          | from f
          | left join (select user_id,apk_version,dt,platform,source_type,regionid from owlx.user_info_pool
@@ -664,7 +659,7 @@ object YDSdk {
            |  t.live_flag,
            |  t.is_timeshift,
            |  LAG(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_code,
-           |  LAG(t.start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
+           |  LAG(t.play_start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
            |  LEAD(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_code,
            |  LEAD(t.play_end_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_start_time,
            |  p.dt,
@@ -688,7 +683,7 @@ object YDSdk {
            |  t.live_flag,
            |  t.is_timeshift,
            |  LAG(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_code,
-           |  LAG(t.start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
+           |  LAG(t.play_start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
            |  LEAD(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_code,
            |  LEAD(t.play_end_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_start_time,
            |  p.dt,
