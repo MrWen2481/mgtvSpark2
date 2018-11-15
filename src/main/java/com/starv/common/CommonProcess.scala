@@ -254,7 +254,7 @@ object CommonProcess {
     val res = ps.executeQuery()
     var channelDic: Map[String, String] = Map()
     while (res.next()) {
-      channelDic += (res.getString(1) -> res.getString(2))
+      channelDic += (res.getString(1).trim -> res.getString(2).trim)
     }
     res.close()
     ps.close()
