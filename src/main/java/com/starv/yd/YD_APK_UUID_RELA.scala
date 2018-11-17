@@ -31,14 +31,21 @@ object YD_APK_UUID_RELA {
 
     //mysql_rela.show()
 
-    val hive_rela = spark.sql("select userid,stbid from piwik.T_HNYD_RELA")
+    val hive_rela = spark.sql("select userid,max(stbid) as stbid from piwik.T_HNYD_RELA group by userid ")
 
     //hive_rela.show()
 
     mysql_rela.createOrReplaceTempView("m_rela")
     hive_rela.createOrReplaceTempView("h_rela")
 
-    val new_user = spark.sql("select h.userid,h.stbid from h_rela h  left join  m_rela m on h.userid=m.userid where m.userid is null ")
+    val new_user = spark.sql(
+      """
+        |  select h.userid,h.stbid
+        |  from h_rela h
+        |  left join  m_rela m
+        |  on h.userid=m.userid
+        |  where m.userid is null
+      """.stripMargin)
 
     val cols = "userid"::"stbid"::Nil
 
