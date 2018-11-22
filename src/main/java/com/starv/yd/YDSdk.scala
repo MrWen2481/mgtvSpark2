@@ -349,6 +349,7 @@ object YDSdk {
               offset_id = data(14),
               category_id = data(15),
               media_id = data(16),
+              media_name = mediaName,
               key = data(17),
               event_type = eventtype,
               keyname = key_name,
