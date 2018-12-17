@@ -45,16 +45,16 @@ object YDSdk {
     //val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x01/dt=$dt/*,/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
     val favRdd = spark.sparkContext.textFile(s"/warehouse/HNYD/sdk_0x04/dt=$dt/*").toDS()
 
-    if (args(2) == "init" ){
-      initData(initRdd,spark,dt,platform)
-    }else if (args(2) == "all"){
-      initData(initRdd,spark,dt,platform)
-      favData(favRdd,spark,dt,platform)
+    if (args(2) == "init") {
+      initData(initRdd, spark, dt, platform)
+    } else if (args(2) == "all") {
+      initData(initRdd, spark, dt, platform)
+      favData(favRdd, spark, dt, platform)
       process(source, spark, dt, platform, state)
-    }else if (args(2) == "fav"){
-      favData(favRdd,spark,dt,platform)
+    } else if (args(2) == "fav") {
+      favData(favRdd, spark, dt, platform)
     }
-    else{
+    else {
       process(source, spark, dt, platform, state)
     }
 
@@ -73,9 +73,9 @@ object YDSdk {
     files.flatMap(_.split("\\\\x0A")).filter(x => {
       //过滤时间格式错乱的数据
       val keys = x.split("\\|", -1)
-        Try(TimeUtils.fastParseSdkDate(keys(12))).isSuccess
-    }).map(x=> {
-      val keys = x.split("\\|",-1)
+      Try(TimeUtils.fastParseSdkDate(keys(12))).isSuccess
+    }).map(x => {
+      val keys = x.split("\\|", -1)
       Init(
         user_id = keys(9),
         create_time = keys(12),
@@ -104,13 +104,13 @@ object YDSdk {
       } else {
         Try(TimeUtils.fastParseSdkDate(keys(4))).isSuccess
       }
-    }).map(x=> {
-      val data = x.split("\\|",-1)
+    }).map(x => {
+      val data = x.split("\\|", -1)
       //兼容 业务标识前有日期的问题 2018-06-03 06:50:19 - 36.157.241.156 - 0x03|
       var filed = ""
-      if (data(0).contains("-") && data(0).contains(".")){
-        filed = data(0).substring(data(0).lastIndexOf("0x"),data(0).length)
-      }else{
+      if (data(0).contains("-") && data(0).contains(".")) {
+        filed = data(0).substring(data(0).lastIndexOf("0x"), data(0).length)
+      } else {
         filed = data(0)
       }
       filed match {
@@ -199,9 +199,9 @@ object YDSdk {
         val data = x.split("\\|", -1)
         //兼容 业务标识前有日期的问题 2018-06-03 06:50:19 - 36.157.241.156 - 0x03|
         var filed = ""
-        if (data(0).contains("-") && data(0).contains(".")){
-          filed = data(0).substring(data(0).lastIndexOf("0x"),data(0).length)
-        }else{
+        if (data(0).contains("-") && data(0).contains(".")) {
+          filed = data(0).substring(data(0).lastIndexOf("0x"), data(0).length)
+        } else {
           filed = data(0)
         }
 
@@ -319,9 +319,9 @@ object YDSdk {
             if data.length >= 26 =>
             val mediaName = mediaNameMap.value.getOrElse(data(16), "")
             var eventtype = ""
-            if (data(18).contains("search")){
+            if (data(18).contains("search")) {
               eventtype = "search"
-            }else{
+            } else {
               eventtype = data(18)
             }
             val keyword = data(17)
@@ -626,46 +626,65 @@ object YDSdk {
       """.stripMargin)
 
     //开机
-//    if (state == "init" || state == "all") {
-//      var df = spark.sql(
-//        s"""
-//           | select
-//           |  user_id,
-//           |  create_time,
-//           |  regionid,
-//           |  apk_version,
-//           |  '$dt',
-//           |  platform,
-//           |  source_type
-//           | from
-//           |   t
-//           |  where state = '$init'
-//          """.stripMargin)
-//      CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
-//    }
+    //    if (state == "init" || state == "all") {
+    //      var df = spark.sql(
+    //        s"""
+    //           | select
+    //           |  user_id,
+    //           |  create_time,
+    //           |  regionid,
+    //           |  apk_version,
+    //           |  '$dt',
+    //           |  platform,
+    //           |  source_type
+    //           | from
+    //           |   t
+    //           |  where state = '$init'
+    //          """.stripMargin)
+    //      CommonProcess.overwriteTable(df, "owlx.res_power_on_day")
+    //    }
     //直播
     if (state == "live" || state == "timeShift" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_chnl_day
+           |select
+           | user_id,
+           | regionid,
+           | play_start_time,
+           | play_end_time,
+           | channel_id,
+           | channel_name,
+           | conf_channel_code,
+           | apk_version,
+           | live_flag,
+           | is_timeshift,
+           | IF(last_code = '' or last_code IS NULL,'开始直播',last_code) as last_code,
+           | last_end_time,
+           | IF(next_code = '' or next_code IS NULL,'结束直播',next_code) as next_code,
+           | next_start_time,
+           | dt,
+           | platform,
+           | source_type
+           |from (
            | select
-           |  t.user_id,
-           |  p.regionid,
-           |  t.play_start_time,
-           |  t.play_end_time,
-           |  t.channel_id,
-           |  t.channel_name,
-           |  t.conf_channel_code,
-           |  p.apk_version,
-           |  t.live_flag,
-           |  t.is_timeshift,
+           |  t.user_id as user_id,
+           |  p.regionid as regionid,
+           |  t.play_start_time as play_start_time,
+           |  t.play_end_time as play_end_time,
+           |  t.channel_id as channel_id,
+           |  t.channel_name as channel_name,
+           |  t.conf_channel_code as conf_channel_code,
+           |  p.apk_version as apk_version,
+           |  t.live_flag as live_flag,
+           |  t.is_timeshift as is_timeshift,
            |  LAG(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_code,
            |  LAG(t.play_start_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS last_end_time,
            |  LEAD(t.conf_channel_code,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_code,
            |  LEAD(t.play_end_time,1) OVER(PARTITION BY t.user_id ORDER BY t.play_start_time) AS next_start_time,
-           |  p.dt,
-           |  p.platform,
-           |  p.source_type
+           |  p.dt as dt,
+           |  p.platform as platform,
+           |  p.source_type as source_type
            |  from
            | t , p
            | where t.user_id = p.user_id
@@ -709,6 +728,7 @@ object YDSdk {
            | t , p
            | where t.user_id = p.user_id
            | and t.state = '$timeShift') tsf
+           | ) at
     """.stripMargin)
     }
     //点播
@@ -846,12 +866,12 @@ object YDSdk {
           //没有上报栏目id
           if (StringUtils.isEmpty(category_id)) {
             for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array(""))) {
-              if (categoryId == "" && category_id == null){
+              if (categoryId == "" || category_id == null) {
                 val resVodTmp = resVodDay.copy()
                 resVodTmp.category_id = ""
                 resVodTmp.channel_id = ""
                 resVodList += resVodTmp
-              }else{
+              } else {
                 val resVodTmp = resVodDay.copy()
                 resVodTmp.category_id = categoryId
                 resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
@@ -869,41 +889,48 @@ object YDSdk {
               resVodList += resVodDay
             } else {
               //上报的栏目id 匹配不到结果的话 老套路 根据媒资id匹配去
-              for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array())) {
-                val resVodTmp = resVodDay.copy()
-                resVodTmp.category_id = categoryId
-                resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
-                resVodList += resVodTmp
+              for (categoryId <- vodCategoryIdMap.value.getOrElse(media_id, Array(""))) {
+                if (categoryId == "" || category_id == null) {
+                  val resVodTmp = resVodDay.copy()
+                  resVodTmp.category_id = ""
+                  resVodTmp.channel_id = ""
+                  resVodList += resVodTmp
+                } else {
+                  val resVodTmp = resVodDay.copy()
+                  resVodTmp.category_id = categoryId
+                  resVodTmp.channel_id = vodChannelIdMap.value.getOrElse((media_id, categoryId), "")
+                  resVodList += resVodTmp
+                }
               }
             }
           }
           //过滤审片栏目名
           resVodList.filter(data => {
             data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
-            for (elem <- testCategoryNameList.value){
-              if (data.category_name.startsWith(elem)){
+            for (elem <- testCategoryNameList.value) {
+              if (data.category_name.startsWith(elem)) {
                 false
               }
             }
             true
           })
           //审片栏目和 flag业务逻辑计算
-          resVodList.foreach(data => {
-            data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
-            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
-//            val breaks = new Breaks
-//            breaks.breakable({
-//              for (elem <- testCategoryNameList.value) {
-//                if (data.category_name.startsWith(elem)) {
-//                  data.flag = MGTVConst.VOD_FILTER_FLAG
-//                  breaks.break()
-//                }
-//              }
-//            })
-          })
+          //          resVodList.foreach(data => {
+          //            data.channel_name = vodChannelNameMap.value.getOrElse(data.channel_id, "")
+          //            data.category_name = vodCategoryNameMap.value.getOrElse(data.category_id, "")
+          //            val breaks = new Breaks
+          //            breaks.breakable({
+          //              for (elem <- testCategoryNameList.value) {
+          //                if (data.category_name.startsWith(elem)) {
+          //                  data.flag = MGTVConst.VOD_FILTER_FLAG
+          //                  breaks.break()
+          //                }
+          //              }
+          //            })
+          //          })
           resVodList
             .filter(_.flag != "2")
-            .groupBy(_.channel_id).foreach(x=>{
+            .groupBy(_.channel_id).foreach(x => {
             val data = x._2.toIterator
             val line = data.next()
             line.flag = "0"
@@ -1086,7 +1113,7 @@ object YDSdk {
                   lb += FullPageTable(uuid, pageName1, pageName2, pageName3)
                   initTime = ""
                 }
-              } else if (x.state.equals(pageView) ) {
+              } else if (x.state.equals(pageView)) {
                 //没有开机的情况
                 if (pageName1 == "") {
                   pageName1 = x.pagename
