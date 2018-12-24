@@ -1335,6 +1335,68 @@ object YDSdk {
            |and t.state='$order'
       """.stripMargin)
 
+      //关联订购
+      spark.sql(
+        s"""
+           |select
+           | t.state,
+           | t.user_id,
+           | p.regionid,
+           | t.media_name,
+           | parent_apk(p.apk_version) as apk_version,
+           | t.product_name,
+           | t.pagename,
+           | t.create_time,
+           | t.confirmation,
+           | t.status,
+           | p.dt,
+           | p.platform
+           |from
+           |t , p
+           |where
+           |t.user_id=p.user_id and
+           |t.state in ('$order','$pageView')
+      """.stripMargin)
+        .as[OrderReleva].groupByKey(_.user_id).flatMapGroups((key, data) => {
+        val ol = new ListBuffer[OrderReleva]()
+        var pagename = ""
+        val arrdata = data.toArray
+        val sortdata = arrdata.sortBy(_.create_time)
+        val iter = sortdata.toIterator
+        while (iter.hasNext) {
+          val line = iter.next()
+          if (line.state == "0x07") {
+            if (pagename == "") {
+              pagename = line.pagename
+            } else {
+              pagename = ""
+              pagename = line.pagename
+            }
+          }
+          // else if (line.state.equals("0x09") && (line.confirmation.equals("1") && line.status.equals("1"))) {
+          else if (line.state.equals("0x09") && line.status.equals("1")) {
+            line.pagename = pagename
+            ol += line
+          }
+        }
+        ol
+      }).createOrReplaceTempView("orderTmp")
+
+      spark.sql(
+        """
+          |insert overwrite table owlx.mid_order_releva
+          |select
+          | user_id,
+          | regionid,
+          | media_name,
+          | apk_version,
+          | product_name,
+          | pagename,
+          | substring(create_time,9,14) as create_time,
+          | dt,
+          | platform
+          |from orderTmp
+        """.stripMargin)
 
     }
     //错误
