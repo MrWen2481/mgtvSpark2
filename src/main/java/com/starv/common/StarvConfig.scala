@@ -28,6 +28,8 @@ object StarvConfig {
   val password: String = properties.getProperty("password")
   val driver: String = properties.getProperty("driver")
 
+  val kudumaster:String = properties.getProperty("kudumaster")
+
   def getProperty(key: String): String = {
     properties.getProperty(key)
   }

@@ -30,7 +30,7 @@ object EpgMysqlToKudu {
       .getOrCreate
 
     import spark.implicits._
-    val kudu = new KuduContext("bigdata-10-43:7051,bigdata-10-44:7051", spark.sparkContext)
+    val kudu = new KuduContext(StarvConfig.kudumaster, spark.sparkContext)
 
     kudu.insertRows(spark.read
       .format("jdbc")
