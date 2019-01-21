@@ -1061,6 +1061,16 @@ object YDSdk {
            |
       """.stripMargin)
 
+      //移动专题
+      spark.sql(
+        s"""
+          |insert overwrite table owlx.mid_subject
+          | select t.user_id,p.regionid,t.special_id,t.create_time,p.dt,p.platform,p.source_type
+          | from t,p
+          | where t.user_id = p.user_id and t.special_id <> ''
+          | and t.state = '$pageView'
+        """.stripMargin)
+
       //全路径
       spark.sql(
         s"""
