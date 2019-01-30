@@ -973,7 +973,7 @@ object YDSdk {
       """.stripMargin)
     }
     //时移
-    if (state == "timeshift" || state == "all") {
+    if (state == "live" || state == "timeshift" || state == "all") {
       spark.sql(
         s"""
            | insert overwrite table owlx.mid_timeshift_day
