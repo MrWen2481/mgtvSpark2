@@ -1,4 +1,4 @@
-package com.starv.hunan
+package com.starv.kudu
 
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -9,13 +9,12 @@ import org.apache.spark.sql.SparkSession
 
 import scala.collection.mutable.ListBuffer
 
-
 /**
-  * @author zyx
-  *         2018/4/25.
+  * @Auther: bigdata
+  * @Date: 2019/2/12
+  * @Description:
   */
-object SaveToHiveByMinute {
-
+object SaveToKuduByMinute {
   case class LiveViewTime(conf_channel_id: String,
                           area_code: String,
                           view_time: String,
@@ -45,9 +44,9 @@ object SaveToHiveByMinute {
     import spark.sql
 
     val kudu = new KuduContext(StarvConfig.kudumaster, spark.sparkContext)
+
     val kuduDF = spark.sqlContext.read.options(Map("kudu.master" -> StarvConfig.kudumaster,"kudu.table" -> "kd_mid_live")).kudu
     kuduDF.createOrReplaceTempView("mid_chnl_day")
-
     val secondDf = sql(
       s"""
          |select
@@ -136,5 +135,4 @@ object SaveToHiveByMinute {
 
 
   }
-
 }
