@@ -80,6 +80,11 @@ object TimeUtils {
     DateFormatUtils.format(DateUtils.parseDate(createTime, "yyyy-MM-dd'T'HH:mm:ssZ"), "yyyyMMddHHmmss")
   }
 
+  //精确到毫秒
+  def fastParseSdkDatems(createTime: String): String = {
+    DateFormatUtils.format(DateUtils.parseDate(createTime, "yyyy-MM-dd'T'HH:mm:ss.SSSZ"), "yyyyMMddHHmmssSSS")
+  }
+
   def fastParseSdkDate(createTime: String, plusMinute: Int): String = {
     DateFormatUtils.format(DateUtils.parseDate(createTime, "yyyy-MM-dd'T'HH:mm:ssZ").getTime + (plusMinute * 60 *
       1000), "yyyyMMddHHmmss")

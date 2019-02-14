@@ -45,8 +45,8 @@ object SaveToHiveByMinute {
     import spark.sql
 
     val kudu = new KuduContext(StarvConfig.kudumaster, spark.sparkContext)
-    val kuduDF = spark.sqlContext.read.options(Map("kudu.master" -> StarvConfig.kudumaster,"kudu.table" -> "kd_mid_live")).kudu
-    kuduDF.createOrReplaceTempView("mid_chnl_day")
+//    val kuduDF = spark.sqlContext.read.options(Map("kudu.master" -> StarvConfig.kudumaster,"kudu.table" -> "kd_mid_live")).kudu
+//    kuduDF.createOrReplaceTempView("mid_chnl_day")
 
     val secondDf = sql(
       s"""
@@ -57,7 +57,7 @@ object SaveToHiveByMinute {
          | regionid,
          | platform,
          | source_type
-         |from mid_chnl_day
+         |from owlx.mid_chnl_day
          | where dt='$dt' and platform='$platform' and source_type='$source_type'
          | and flag= '0'
       """.stripMargin)

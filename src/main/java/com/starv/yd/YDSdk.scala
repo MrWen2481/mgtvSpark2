@@ -400,6 +400,7 @@ object YDSdk {
               media_name = data(12),
               category_id = data(13),
               channel_id = data(20),
+              confirmation = data(16),
               status = data(17),
               pagepath = data(6),
               nextpagepath = data(7),
