@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON
 import com.starv.common.{CommonProcess, MGTVConst}
 import com.starv.table.owlx.MidOnlineDay
 import com.starv.utils.BroadcastUtils
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.SparkSession
 
 import scala.util.Try
@@ -51,6 +52,11 @@ object ApkOnline {
     import spark.implicits._
     spark.read.textFile(s"/warehouse/$platform/itvrun_online/dt=$dt/*")
       .filter(x => Try(JSON.parseObject(x)).isSuccess)
+        .filter(x => {
+          val json = JSON.parseObject(x)
+          var uuid = json.getString("uuid")
+          StringUtils.isNotBlank(uuid)
+        })
       .map(x => {
         val json = JSON.parseObject(x)
         var uuid = json.getString("uuid")

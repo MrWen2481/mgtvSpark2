@@ -47,6 +47,7 @@ object SaveToKuduByMinute {
 
     val kuduDF = spark.sqlContext.read.options(Map("kudu.master" -> StarvConfig.kudumaster,"kudu.table" -> "kd_mid_live")).kudu
     kuduDF.createOrReplaceTempView("mid_chnl_day")
+
     val secondDf = sql(
       s"""
          |select
