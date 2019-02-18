@@ -1052,6 +1052,10 @@ object YDSdk {
            |   t.offset_group,
            |   t.media_group,
            |   t.create_time,
+           |   '',
+           |   '',
+           |   '',
+           |   '',
            |   p.dt,
            |   p.platform,
            |   p.source_type

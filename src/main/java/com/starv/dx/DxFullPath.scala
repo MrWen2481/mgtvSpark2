@@ -3,9 +3,9 @@ package com.starv.dx
 import java.util.regex.Pattern
 
 import com.starv.SourceTmp
-import com.starv.common.MGTVConst
+import com.starv.common.{CommonProcess, MGTVConst}
 import com.starv.table.owlx.{FullPagePath, FullPageTable, OrderReleva}
-import com.starv.utils.TimeUtils
+import com.starv.utils.{BroadcastUtils, TimeUtils}
 import com.starv.yd.YDConst
 import com.starv.yd.YDConst.{INIT, ORDER, PAGE_VIEW}
 import org.apache.commons.lang3.StringUtils
@@ -44,7 +44,13 @@ object DxFullPath {
   }
 
   //电信SDK全路径和节目精准关联订购
+  /*
+    电信SDK数据上传示例
+    0x01|manufacturers|mac|model|apk_version|system_version|operator|ip|user_account|user_id|uuid|os|create_time|platform|area_id|sdk_version|reserve| reserve| reserve| reserve| reserve| reserve| reserve| reserve
+    0x07|mac|user_id|operator|create_time|sp_code|sp_code|page_id|pagepath|nextpagepath|pagename|special_id|way|offset_name|offset_id|category_id|media_id|key|event_type|button_id|button_name|||offset_group|media_group|channel_id|sdk_version|offset_group_id|Serial_number|Interface_properties|Interface_identification|Request_classification
+     */
   def allPathStatis(files: Dataset[String], spark: SparkSession, dt: String, platform: String): Unit ={
+    val testUserBroadSet = BroadcastUtils.getFilterUserIdPrev(spark, platform)
     import spark.implicits._
     files.flatMap(_.split("\\\\x0A")).filter(x => {
       //过滤时间格式错乱的数据
@@ -64,26 +70,37 @@ object DxFullPath {
         filed = data(0)
       }
       filed match {
-        /*
-             页面访问
-              0x07|mac|user_id|operator|create_time|sp_code|sp_code|page_id|pagepath|nextpagepath|pagename|special_id|way|offset_name|offset_id|category_id|media_id|key|event_type|button_id|b utton_name|||offset_group|media_group|channel_id
-              0x07|3C0CDB02898D|004903FF0003431000113C0CDB02898D|003|2018-03-16T18:48:11+0800|||215|com.hunantv.operator/com.fonsview.mangotv.MainActivity||排行榜||0||||||home_page|22|导航右键|||||
-            */
+
         case PAGE_VIEW
-          if data.length >= 11 =>
+          if data.length >= 32 =>
           SourceTmp(
             state = filed,
             user_id = data(2),
             create_time = TimeUtils.fastParseSdkDatems(data(4)),
+            sp_code = data(5),
+            page_id = data(7),
+            pagepath = data(8),
+            nextpagepath = data(9),
             pagename = data(10),
+            special_id = data(11),
+            way = data(12),
+            offset_name = data(13),
+            offset_id = data(14),
+            category_id = data(15),
+            key = data(17),
+            event_type = data(18),
+            offset_group = data(23),
+            media_group = data(24),
+            channel_id = data(25),
+            serial_number = data(28),
+            interface_properties = data(29),
+            interface_identification = data(30),
+            request_classification = data(31),
             platform = platform,
             source_type = MGTVConst.SDK
           )
 
-        /*
-           开机
-           0x01| manufacturers|mac|model|apk_version|system_version|operator|ip|user_account|user_id|uuid|os|create_time|platform|area_id|sdk_ version| reserve| reserve| reserve| reserve| reserve| reserve| reserve|
-           0x01|JIUZHOU|0C4933BEB251|MGV2000-J-04_HUNAN|YYS.5a.4.6.Y3.4.HNYD.0.0_Release|4.4.2|003|192.168.1.3|U04048205|004903FF0003204018170C4933BEB251|004903FF0003204018170C4933BEB251|android|2018-05-28T11:20:23+0800|HNYD|07311|v4.9.1||||||||            */
+
         case INIT
           if data.length >= 15 =>
           SourceTmp(
@@ -91,7 +108,7 @@ object DxFullPath {
             user_id = data(9),
             create_time = TimeUtils.fastParseSdkDatems(data(12)),
             apk_version = data(4),
-            regionid = "14301",
+            regionid = CommonProcess.getHNDXRegionId(data(9)),
             platform = platform,
             source_type = MGTVConst.SDK
           )
@@ -120,6 +137,13 @@ object DxFullPath {
           source_type = MGTVConst.SDK
         )
       }
+    }).filter(x => {
+      for (userid <- testUserBroadSet.value) {
+        if (x.user_id.startsWith(userid)) {
+          false
+        }
+      }
+      true
     }).createOrReplaceTempView("t")
     spark.sqlContext.cacheTable("t")
     spark.sql(
@@ -127,6 +151,21 @@ object DxFullPath {
          |select user_id,regionid,apk_version,'$dt' as dt,platform,source_type from t where state = '$INIT'
       """.stripMargin).createOrReplaceTempView("p")
     spark.sqlContext.cacheTable("p")
+
+    //35号工单电信SDK推荐位统计
+    spark.sql(
+      s"""
+         |insert overwrite table owlx.mid_pageview_day
+         |select
+         | t.user_id,p.regionid,t.sp_code,t.pagepath,t.nextpagepath,
+         | t.pagename,t.event_type,t.special_id,t.page_id,t.way,
+         | t.offset_name,t.offset_id,t.key,'',t.media_id,
+         | t.media_name,t.category_id,t.channel_id,p.apk_version,
+         | t.offset_group,t.media_group,t.create_time,t.interface_properties,
+         | t.interface_identification,t.request_classification,t.serial_number,$dt,t.platform,t.source_type
+         | from p,t
+         |where t.state='$PAGE_VIEW' and t.user_id=p.user_id
+      """.stripMargin)
 
     //正则获取大版本apkVersion
     val pattern = Pattern.compile("(.*?\\..*?\\..*?)\\..*?")
