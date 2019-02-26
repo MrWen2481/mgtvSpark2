@@ -126,9 +126,24 @@ object DXApkVod {
       "category_id,apk_version,pro_id,clum_id) order by play_start_time  asc ) ranker from (select " + vodschemastring + " " +
       " from vodtemptime   group by " + vodschemastring + " having count(1)=1 ) qc ) enddis where ranker=1 ) disstime" +
       " group by " + vodschemastring + "  having count(1)=1)  vodday where rank=1 ")
-      .createOrReplaceTempView("vodtemp")
+//      .createOrReplaceTempView("vodtemp")
+//    spark.sqlContext.cacheTable("vodtemp")
+      .rdd
+      .map(p=>{
+        InitVodTmp(
+          uuid = p.getString(0),
+          regionid = p.getString(1),
+          play_start_time = timefilter(p.getString(2) + "", dt),
+          play_end_time = timefilter(p.getString(3) + "", dt),
+          media_id = p.getString(4),
+          media_name = p.getString(5),
+          category_id = p.getString(6),
+          apk_version = p.getString(7),
+          pro_id = p.getString(8),
+          clum_id = p.getString(9)
+        )
+      }).toDF().createOrReplaceTempView("vodtemp")
     spark.sqlContext.cacheTable("vodtemp")
-//      .rdd
 //      .map { p =>
 //        InitVodTmp(p(0), p(1), timefilter(p(2) + "", dt), timefilter(p(3) + "", dt), p(4), p(5), p(6), p(7), p(8), p(9))
 //      }
