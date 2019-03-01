@@ -1,5 +1,6 @@
 package com.starv.dx
 
+
 import java.util.regex.Pattern
 
 import com.starv.SourceTmp
@@ -9,6 +10,8 @@ import com.starv.utils.{BroadcastUtils, TimeUtils}
 import com.starv.yd.YDConst
 import com.starv.yd.YDConst.{INIT, ORDER, PAGE_VIEW}
 import org.apache.commons.lang3.StringUtils
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.collection.mutable.ListBuffer
@@ -36,10 +39,17 @@ object DxFullPath {
       .getOrCreate()
     import spark.implicits._
 
-    //val allPathRdd = spark.sparkContext.textFile(s"/warehouse/HNDX/sdk_0x01/dt=$dt/*,/warehouse/HNDX/sdk_0x07/dt=$dt/*,/warehouse/HNDX/sdk_0x09/dt=$dt/*").toDS()
-    val allPathRdd = spark.sparkContext.textFile(s"/warehouse/HNDX/sdk_0x01/dt=$dt/*,/warehouse/HNDX/sdk_0x07/dt=$dt/*").toDS()
+    var allPathRdd = ""
+    val fssystem = FileSystem.get(new Configuration())
+    if (fssystem.isFile(new Path(s"/warehouse/HNDX/sdk_0x09/dt=$dt/*"))){
+       allPathRdd = s"/warehouse/HNDX/sdk_0x01/dt=$dt/*,/warehouse/HNDX/sdk_0x07/dt=$dt/*,/warehouse/HNDX/sdk_0x09/dt=$dt/*"
+    }else{
+       allPathRdd = s"/warehouse/HNDX/sdk_0x01/dt=$dt/*,/warehouse/HNDX/sdk_0x07/dt=$dt/*"
+    }
 
-    allPathStatis(allPathRdd,spark,dt,platform)
+    //val allPathRdd = spark.sparkContext.textFile(s"/warehouse/HNDX/sdk_0x01/dt=$dt/*,/warehouse/HNDX/sdk_0x07/dt=$dt/*").toDS()
+      val AllPathRDD = spark.sparkContext.textFile(allPathRdd).toDS()
+    allPathStatis(AllPathRDD,spark,dt,platform)
 
   }
 
